@@ -19,6 +19,10 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const googleProvider = new GoogleAuthProvider();
 
+export async function getCurrentIdToken(): Promise<string | null> {
+  return auth.currentUser?.getIdToken() ?? null;
+}
+
 /**
  * Sign in with Google popup, return the Firebase ID token.
  */

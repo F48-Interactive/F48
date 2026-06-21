@@ -1,3 +1,5 @@
+import { getCurrentIdToken } from './firebase';
+
 const DEFAULT_API_URL = 'http://localhost:3000/api/v1';
 
 function cleanEnvValue(value: string | undefined, fallback = ''): string {
@@ -55,6 +57,11 @@ class ApiClient {
 
     if (options?.idempotencyKey) {
       headers['X-Idempotency-Key'] = options.idempotencyKey;
+    }
+
+    const idToken = await getCurrentIdToken();
+    if (idToken) {
+      headers.Authorization = `Bearer ${idToken}`;
     }
 
     const res = await fetch(`${this.baseUrl}${path}`, {
