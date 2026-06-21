@@ -34,7 +34,7 @@
 ## D-004: Abstract adapter pattern for external providers
 
 **Date:** 2026-06-20
-**Decision:** All external API integrations (Games Kinbo, YouTube, Cloudinary) use abstract adapter classes with real and mock implementations, swapped via NestJS DI factories.
+**Decision:** External API integrations (Games Kinbo, YouTube) use abstract adapter classes with real and mock implementations, swapped via NestJS DI factories. Media is stored as externally hosted HTTPS links, so it does not need a backend provider adapter.
 **Rationale:** PRD ARCH-012. Mock adapters enable development without credentials and reliable testing. Swapping a provider never touches product code.
 
 ---

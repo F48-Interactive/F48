@@ -83,18 +83,6 @@ export class EnvService {
     return this.config.FIREBASE_PRIVATE_KEY;
   }
 
-  get cloudinaryCloudName(): string {
-    return this.config.CLOUDINARY_CLOUD_NAME;
-  }
-
-  get cloudinaryApiKey(): string {
-    return this.config.CLOUDINARY_API_KEY;
-  }
-
-  get cloudinaryApiSecret(): string {
-    return this.config.CLOUDINARY_API_SECRET;
-  }
-
   get gamesKinboApiUrl(): string {
     return this.config.GAMES_KINBO_API_URL;
   }

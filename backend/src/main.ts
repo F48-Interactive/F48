@@ -113,7 +113,7 @@ async function bootstrap(): Promise<void> {
     .addTag('Banners', 'Home hero banner management')
     .addTag('Catalog', 'Map catalog management')
     .addTag('Notifications', 'In-app notifications')
-    .addTag('Media', 'File upload and media asset management')
+    .addTag('Media', 'Externally hosted media link management')
     .addTag('Health', 'Health and readiness checks')
     .build();
 

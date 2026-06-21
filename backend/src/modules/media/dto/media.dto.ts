@@ -11,9 +11,15 @@ export const MediaPurposeSchema = z.enum([
   'deposit_proof',
 ]);
 
+export const ImageFormatSchema = z.enum(['jpg', 'jpeg', 'png', 'webp']);
+
 export const RegisterMediaAssetSchema = z.object({
   purpose: MediaPurposeSchema,
-  publicId: z.string().min(3).max(500),
+  url: z.string().url().max(2048),
+  format: ImageFormatSchema.optional(),
+  width: z.number().int().positive().max(10000).optional(),
+  height: z.number().int().positive().max(10000).optional(),
+  sizeBytes: z.number().int().nonnegative().max(50 * 1024 * 1024).optional(),
 });
 
 export type RegisterMediaAssetInput = z.infer<typeof RegisterMediaAssetSchema>;

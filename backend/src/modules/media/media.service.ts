@@ -1,16 +1,12 @@
-/**
- * MediaService — Manage media assets (Cloudinary signed upload flow).
- * MEDIA-001/002: Client uploads to Cloudinary with signed signature,
- * then registers the asset here.
- */
+/** MediaService - manage externally hosted media links. */
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../config/database.service.js';
-import { CloudinaryAdapter } from '../../providers/cloudinary/cloudinary.adapter.js';
 import { AuditService } from '../audit/audit.service.js';
 import { BadRequestError, NotFoundError } from '../../lib/errors.js';
 import { ErrorCodes } from '../../common/constants/error-codes.js';
 import type { RequestUser } from '../../common/decorators/current-user.decorator.js';
 import { MediaAuthorityService } from '../../domain/media-authority.service.js';
+import type { RegisterMediaAssetInput } from './dto/media.dto.js';
 
 @Injectable()
 export class MediaService {
@@ -18,39 +14,23 @@ export class MediaService {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly cloudinary: CloudinaryAdapter,
     private readonly authority: MediaAuthorityService,
     private readonly audit: AuditService,
   ) {}
 
-  /**
-   * Generate a signed upload signature for client-side Cloudinary upload.
-   * The client uses this to upload directly to Cloudinary (MEDIA-002).
-   */
-  async getUploadSignature(purpose: string) {
-    const mediaPurpose = this.authority.assertPurpose(purpose);
-    const policy = this.authority.getPolicy(mediaPurpose);
-    const folder = this.authority.folderForPurpose(mediaPurpose);
-    const signature = await this.cloudinary.generateUploadSignature(folder, [
-      ...policy.allowedFormats,
-    ]);
-    return signature;
-  }
-
-  /**
-   * Register an uploaded asset after client completes Cloudinary upload.
-   * Client sends the publicId back and we verify + store metadata.
-   */
-  async registerAsset(params: {
-    uploaderId: string;
-    purpose: string;
-    publicId: string;
-  }) {
+  async registerAsset(params: RegisterMediaAssetInput & { uploaderId: string }) {
     const purpose = this.authority.assertPurpose(params.purpose);
-    this.authority.assertPublicIdMatchesPurpose(params.publicId, purpose);
+    const details = this.authority.normalizeExternalAsset({
+      purpose,
+      url: params.url,
+      format: params.format,
+      width: params.width,
+      height: params.height,
+      sizeBytes: params.sizeBytes,
+    });
 
     const existing = await this.prisma.mediaAsset.findFirst({
-      where: { cloudinaryId: params.publicId },
+      where: { secureUrl: details.url },
       select: { id: true },
     });
     if (existing) {
@@ -60,30 +40,19 @@ export class MediaService {
       );
     }
 
-    const details = await this.cloudinary.getAssetDetails(params.publicId);
-
-    if (!details) {
-      throw new BadRequestError(
-        ErrorCodes.VALIDATION_FAILED,
-        'Cloudinary asset not found. Upload may have failed.',
-      );
-    }
-    this.authority.assertAssetMatchesPolicy(purpose, details);
-
     const policy = this.authority.getPolicy(purpose);
-
     const asset = await this.prisma.mediaAsset.create({
       data: {
         uploaderId: params.uploaderId,
         purpose,
         accessLevel: policy.accessLevel,
-        cloudinaryId: details.publicId,
+        cloudinaryId: details.url,
         url: details.url,
-        secureUrl: details.secureUrl,
+        secureUrl: details.url,
         format: details.format,
         width: details.width,
         height: details.height,
-        sizeBytes: details.bytes,
+        sizeBytes: details.sizeBytes,
       },
     });
 
@@ -96,7 +65,8 @@ export class MediaService {
       newValue: {
         purpose,
         accessLevel: policy.accessLevel,
-        sizeBytes: details.bytes,
+        url: details.url,
+        sizeBytes: details.sizeBytes,
       },
     });
 
@@ -104,7 +74,6 @@ export class MediaService {
     return asset;
   }
 
-  /** Get media asset by ID. */
   async getById(assetId: string, user: RequestUser) {
     const asset = await this.prisma.mediaAsset.findUnique({
       where: { id: assetId },
@@ -116,19 +85,9 @@ export class MediaService {
       );
     }
     this.authority.assertCanReadAsset(user, asset);
-
-    if (asset.accessLevel === 'restricted') {
-      const signedUrl = this.cloudinary.generateSignedUrl(
-        asset.cloudinaryId,
-        300,
-      );
-      return { ...asset, url: signedUrl, secureUrl: signedUrl, signedUrl };
-    }
-
     return asset;
   }
 
-  /** Delete media asset. */
   async delete(assetId: string, user: RequestUser) {
     const asset = await this.prisma.mediaAsset.findUnique({
       where: { id: assetId },
@@ -141,7 +100,6 @@ export class MediaService {
     }
     this.authority.assertCanDeleteAsset(user, asset);
 
-    await this.cloudinary.deleteAsset(asset.cloudinaryId);
     await this.prisma.mediaAsset.delete({ where: { id: assetId } });
 
     await this.audit.log({
@@ -154,6 +112,7 @@ export class MediaService {
         purpose: asset.purpose,
         accessLevel: asset.accessLevel,
         uploaderId: asset.uploaderId,
+        url: asset.secureUrl,
       },
     });
   }
