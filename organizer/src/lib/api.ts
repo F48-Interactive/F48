@@ -1,4 +1,21 @@
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api/v1';
+const DEFAULT_API_URL = 'http://localhost:3000/api/v1';
+
+function cleanEnvValue(value: string | undefined, fallback = ''): string {
+  return (value || fallback).trim().replace(/^["']+|["']+$/g, '');
+}
+
+function normalizeApiUrl(value: string | undefined): string {
+  const assignmentPrefix = 'VITE_API_URL=';
+  let cleaned = cleanEnvValue(value, DEFAULT_API_URL);
+
+  if (cleaned.startsWith(assignmentPrefix)) {
+    cleaned = cleanEnvValue(cleaned.slice(assignmentPrefix.length), DEFAULT_API_URL);
+  }
+
+  return cleaned.replace(/\/+$/g, '');
+}
+
+const API_URL = normalizeApiUrl(import.meta.env.VITE_API_URL);
 
 export interface ApiError {
   code: string;
@@ -46,12 +63,6 @@ class ApiClient {
       credentials: 'include',
       body: body ? JSON.stringify(body) : undefined,
     });
-
-    if (res.status === 401) {
-      // Session expired - redirect to landing
-      window.location.href = '/';
-      throw new Error('Session expired');
-    }
 
     const json = await res.json().catch(() => ({}));
 
