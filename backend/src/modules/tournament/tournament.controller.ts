@@ -14,6 +14,8 @@ import {
 } from '@nestjs/common';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { TournamentService } from './tournament.service.js';
+import { TournamentConfigService } from './tournament-config.service.js';
+import { TournamentQueryService } from './tournament-query.service.js';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe.js';
 import {
   CurrentUser,
@@ -36,6 +38,8 @@ import {
 export class TournamentController {
   constructor(
     private readonly tournamentService: TournamentService,
+    private readonly tournamentConfig: TournamentConfigService,
+    private readonly tournamentQuery: TournamentQueryService,
     private readonly access: AccessAuthorityService,
   ) {}
 
@@ -58,7 +62,7 @@ export class TournamentController {
     @Query('limit') limit?: string,
   ) {
     const parsed = TournamentListSchema.parse({ status, mode, page, limit });
-    return this.tournamentService.list(parsed);
+    return this.tournamentQuery.list(parsed);
   }
 
   @Get('my')
@@ -68,7 +72,7 @@ export class TournamentController {
     @Query('page') page?: string,
     @Query('limit') limit?: string,
   ) {
-    return this.tournamentService.listByOrganizer(
+    return this.tournamentQuery.listByOrganizer(
       user.id,
       Math.max(1, parseInt(page ?? '1', 10) || 1),
       Math.min(100, Math.max(1, parseInt(limit ?? '20', 10) || 20)),
@@ -79,7 +83,7 @@ export class TournamentController {
   @Public()
   @ApiOperation({ summary: 'Get tournament details' })
   async getById(@Param('id') id: string) {
-    return this.tournamentService.getById(id);
+    return this.tournamentQuery.getById(id);
   }
 
   @Patch(':id')
@@ -122,7 +126,7 @@ export class TournamentController {
     @Body() body: any,
   ) {
     this.access.assertActiveUser(user);
-    return this.tournamentService.setScoringConfig(user, id, body);
+    return this.tournamentConfig.setScoringConfig(user, id, body);
   }
 
   @Post(':id/config/:configVersionId/prizes')
@@ -136,7 +140,7 @@ export class TournamentController {
     @Body() body: any,
   ) {
     this.access.assertActiveUser(user);
-    return this.tournamentService.setPrizeConfig(
+    return this.tournamentConfig.setPrizeConfig(
       user,
       id,
       configVersionId,
@@ -155,7 +159,7 @@ export class TournamentController {
     @Body() body: any,
   ) {
     this.access.assertActiveUser(user);
-    return this.tournamentService.setTiebreakConfig(
+    return this.tournamentConfig.setTiebreakConfig(
       user,
       id,
       configVersionId,

@@ -9,8 +9,10 @@ COPY package.json package-lock.json ./
 RUN npm ci --ignore-scripts
 
 COPY prisma ./prisma/
+COPY prisma.config.cjs ./
 COPY tsconfig.json tsconfig.build.json nest-cli.json ./
 COPY src ./src/
+RUN npx prisma@7.8.0 generate
 RUN npm run build
 
 RUN npm prune --production
@@ -26,6 +28,7 @@ COPY --from=builder --chown=f48:f48 /app/dist ./dist/
 COPY --from=builder --chown=f48:f48 /app/node_modules ./node_modules/
 COPY --from=builder --chown=f48:f48 /app/package.json ./
 COPY --from=builder --chown=f48:f48 /app/prisma ./prisma/
+COPY --from=builder --chown=f48:f48 /app/prisma.config.cjs ./
 
 USER f48
 
