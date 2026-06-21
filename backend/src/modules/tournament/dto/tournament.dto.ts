@@ -7,15 +7,23 @@ import { z } from 'zod';
 // ─────────────────────────────────────────────────────────────────────────────
 // Create tournament (draft)
 // ─────────────────────────────────────────────────────────────────────────────
+const FundingTypeSchema = z.enum([
+  'free',
+  'organizer_funded',
+  'f48_sponsored',
+  'entry_fee',
+]);
+
 export const CreateTournamentSchema = z.object({
   title: z.string().min(3).max(100),
   description: z.string().max(2000).optional(),
   mode: z.enum(['solo', 'duo', 'squad']),
-  fundingType: z.enum(['f48_sponsored', 'entry_fee']),
+  fundingType: FundingTypeSchema,
   structureType: z.enum(['direct_final', 'qualifiers_to_final']),
   scoringModel: z.enum(['combined', 'placement_only', 'kills_only']),
   maxUnits: z.number().int().min(2).max(48),
   entryFeePaise: z.number().int().min(0).optional(),
+  prizePoolPaise: z.number().int().min(0).optional(),
   scheduledStartAt: z.string().datetime().optional(),
   registrationOpenAt: z.string().datetime().optional(),
   registrationCloseAt: z.string().datetime().optional(),
@@ -28,14 +36,16 @@ export const CreateTournamentSchema = z.object({
 export type CreateTournamentInput = z.infer<typeof CreateTournamentSchema>;
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Update tournament (draft/changes_required only)
+// Update tournament (draft only)
 // ─────────────────────────────────────────────────────────────────────────────
 export const UpdateTournamentSchema = z.object({
   title: z.string().min(3).max(100).optional(),
   description: z.string().max(2000).optional(),
   mode: z.enum(['solo', 'duo', 'squad']).optional(),
+  fundingType: FundingTypeSchema.optional(),
   maxUnits: z.number().int().min(2).max(48).optional(),
   entryFeePaise: z.number().int().min(0).optional(),
+  prizePoolPaise: z.number().int().min(0).optional(),
   scheduledStartAt: z.string().datetime().optional(),
   registrationOpenAt: z.string().datetime().optional(),
   registrationCloseAt: z.string().datetime().optional(),

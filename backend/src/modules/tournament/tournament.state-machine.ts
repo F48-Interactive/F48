@@ -1,49 +1,45 @@
 /**
- * Tournament State Machine — 17 states, role-gated transitions.
- * Uses the generic StateMachine from src/lib/state-machine.ts.
+ * Tournament State Machine.
+ * Organizers publish directly; F48 review states are not part of the product flow.
  */
 import { createStateMachine } from '../../lib/state-machine.js';
 
 export type TournamentState =
-  | 'draft' | 'submitted' | 'changes_required' | 'approved'
-  | 'published' | 'registration_open' | 'registration_closed'
-  | 'check_in' | 'live' | 'results_pending' | 'dispute_window'
-  | 'results_final' | 'settlement' | 'completed'
-  | 'canceled' | 'voided' | 'archived';
+  | 'draft'
+  | 'published'
+  | 'registration_open'
+  | 'registration_closed'
+  | 'check_in'
+  | 'live'
+  | 'provisional_results'
+  | 'dispute_window'
+  | 'results_final'
+  | 'completed'
+  | 'canceled'
+  | 'voided'
+  | 'archived';
 
 export type TournamentAction =
-  | 'submit' | 'approve' | 'request_changes' | 'resubmit'
-  | 'publish' | 'open_registration' | 'close_registration'
-  | 'start_check_in' | 'go_live' | 'end_matches'
-  | 'open_dispute_window' | 'finalize_results'
-  | 'begin_settlement' | 'complete'
-  | 'cancel' | 'void' | 'archive';
+  | 'publish'
+  | 'open_registration'
+  | 'close_registration'
+  | 'start_check_in'
+  | 'go_live'
+  | 'publish_provisional_results'
+  | 'open_dispute_window'
+  | 'finalize_results'
+  | 'complete'
+  | 'cancel'
+  | 'void'
+  | 'archive';
 
-export const tournamentStateMachine = createStateMachine<TournamentState, TournamentAction>({
+export const tournamentStateMachine = createStateMachine<
+  TournamentState,
+  TournamentAction
+>({
   transitions: {
-    submit: {
-      from: ['draft'],
-      to: 'submitted',
-      requiredRoles: ['organizer'],
-    },
-    approve: {
-      from: ['submitted'],
-      to: 'approved',
-      requiredRoles: ['admin', 'super_admin'],
-    },
-    request_changes: {
-      from: ['submitted'],
-      to: 'changes_required',
-      requiredRoles: ['admin', 'super_admin'],
-      requiresReason: true,
-    },
-    resubmit: {
-      from: ['changes_required'],
-      to: 'submitted',
-      requiredRoles: ['organizer'],
-    },
     publish: {
-      from: ['approved'],
+      from: ['draft'],
       to: 'published',
       requiredRoles: ['organizer'],
     },
@@ -67,40 +63,34 @@ export const tournamentStateMachine = createStateMachine<TournamentState, Tourna
       to: 'live',
       requiredRoles: ['organizer', 'admin', 'super_admin'],
     },
-    end_matches: {
+    publish_provisional_results: {
       from: ['live'],
-      to: 'results_pending',
+      to: 'provisional_results',
       requiredRoles: ['organizer', 'admin', 'super_admin'],
     },
     open_dispute_window: {
-      from: ['results_pending'],
+      from: ['provisional_results'],
       to: 'dispute_window',
       requiredRoles: ['organizer', 'admin', 'super_admin'],
     },
     finalize_results: {
       from: ['dispute_window'],
       to: 'results_final',
-      requiredRoles: ['admin', 'super_admin'],
-    },
-    begin_settlement: {
-      from: ['results_final'],
-      to: 'settlement',
-      requiredRoles: ['admin', 'super_admin'],
+      requiredRoles: ['organizer', 'admin', 'super_admin'],
     },
     complete: {
-      from: ['settlement'],
+      from: ['results_final'],
       to: 'completed',
-      requiredRoles: ['admin', 'super_admin'],
+      requiredRoles: ['organizer', 'admin', 'super_admin'],
     },
     cancel: {
-      from: ['draft', 'submitted', 'changes_required', 'approved', 'published',
-             'registration_open', 'registration_closed'],
+      from: ['draft', 'published', 'registration_open', 'registration_closed'],
       to: 'canceled',
       requiredRoles: ['organizer', 'admin', 'super_admin'],
       requiresReason: true,
     },
     void: {
-      from: ['check_in', 'live', 'results_pending', 'dispute_window'],
+      from: ['check_in', 'live', 'provisional_results', 'dispute_window'],
       to: 'voided',
       requiredRoles: ['admin', 'super_admin'],
       requiresReason: true,

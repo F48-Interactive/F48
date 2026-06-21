@@ -166,69 +166,21 @@ export class OrganizerService {
       },
     });
 
+    await this.prisma.organizer.update({
+      where: { id: organizer.id },
+      data: {
+        displayName: channelData.channelName,
+        verificationStatus: 'verified',
+        verifiedAt: new Date(),
+      },
+    });
+
     this.logger.log(
       { organizerId: organizer.id, channelId: channel.channelId },
       'YouTube channel submitted',
     );
 
     return channel;
-  }
-
-  /**
-   * Submit organizer for admin verification (ORG-ID-003).
-   */
-  async submitForVerification(userId: string) {
-    const organizer = await this.prisma.organizer.findUnique({
-      where: { userId },
-      include: { youtubeChannels: true },
-    });
-
-    if (!organizer) {
-      throw new NotFoundError(
-        ErrorCodes.RESOURCE_NOT_FOUND,
-        'Organizer profile not found.',
-      );
-    }
-
-    if (organizer.verificationStatus !== 'profile_incomplete') {
-      throw new BadRequestError(
-        ErrorCodes.VALIDATION_FAILED,
-        `Cannot submit for verification from status: ${organizer.verificationStatus}`,
-      );
-    }
-
-    // Require at least one YouTube channel
-    if (organizer.youtubeChannels.length === 0) {
-      throw new BadRequestError(
-        ErrorCodes.VALIDATION_FAILED,
-        'At least one YouTube channel is required for verification.',
-      );
-    }
-
-    // Require display name
-    if (!organizer.displayName) {
-      throw new BadRequestError(
-        ErrorCodes.VALIDATION_FAILED,
-        'Display name is required for verification.',
-      );
-    }
-
-    const updated = await this.prisma.organizer.update({
-      where: { id: organizer.id },
-      data: { verificationStatus: 'verification_pending' },
-    });
-
-    await this.statusHistory.record({
-      resourceType: 'organizer',
-      resourceId: organizer.id,
-      previousStatus: 'profile_incomplete',
-      newStatus: 'verification_pending',
-      actorId: userId,
-      reason: 'Organizer submitted for verification',
-    });
-
-    this.logger.log({ organizerId: organizer.id }, 'Organizer submitted for verification');
-    return updated;
   }
 
   /**
@@ -341,6 +293,17 @@ export class OrganizerService {
           totalTournamentsCompleted: true,
           totalPrizesDistributedPaise: true,
           verifiedAt: true,
+          youtubeChannels: {
+            where: { status: 'active' },
+            take: 1,
+            select: {
+              channelName: true,
+              handle: true,
+              url: true,
+              imageUrl: true,
+              subscriberCount: true,
+            },
+          },
         },
         orderBy: { verifiedAt: 'desc' },
         skip: (page - 1) * limit,

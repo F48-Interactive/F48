@@ -87,7 +87,7 @@ export class TournamentController {
   }
 
   @Patch(':id')
-  @ApiOperation({ summary: 'Update tournament (draft/changes_required)' })
+  @ApiOperation({ summary: 'Update tournament draft' })
   @UsePipes(new ZodValidationPipe(UpdateTournamentSchema))
   async update(
     @CurrentUser() user: RequestUser,

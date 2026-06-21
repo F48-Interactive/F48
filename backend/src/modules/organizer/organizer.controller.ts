@@ -52,7 +52,7 @@ export class OrganizerController {
   @UsePipes(new ZodValidationPipe(CreateOrganizerSchema))
   async createProfile(
     @CurrentUser() user: RequestUser,
-    @Body() body: { displayName: string; description?: string },
+    @Body() body: { displayName?: string; description?: string },
   ) {
     this.assertActive(user);
     return this.organizerService.createProfile(user.id, body);
@@ -88,13 +88,6 @@ export class OrganizerController {
       body.channelUrl,
       this.youtubeLookup,
     );
-  }
-
-  @Post('submit-verification')
-  @ApiOperation({ summary: 'Submit organizer for admin verification' })
-  async submitForVerification(@CurrentUser() user: RequestUser) {
-    this.assertActive(user);
-    return this.organizerService.submitForVerification(user.id);
   }
 
   @Get()

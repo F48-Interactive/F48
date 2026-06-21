@@ -51,18 +51,14 @@ export type FundingEligibility =
 
 export const TournamentStatus = {
   DRAFT: 'draft',
-  SUBMITTED: 'submitted',
-  CHANGES_REQUIRED: 'changes_required',
-  APPROVED: 'approved',
   PUBLISHED: 'published',
   REGISTRATION_OPEN: 'registration_open',
   REGISTRATION_CLOSED: 'registration_closed',
   CHECK_IN: 'check_in',
   LIVE: 'live',
-  RESULTS_PENDING: 'results_pending',
+  PROVISIONAL_RESULTS: 'provisional_results',
   DISPUTE_WINDOW: 'dispute_window',
   RESULTS_FINAL: 'results_final',
-  SETTLEMENT: 'settlement',
   COMPLETED: 'completed',
   CANCELED: 'canceled',
   VOIDED: 'voided',
@@ -94,6 +90,8 @@ export const MODE_PLAYERS_PER_UNIT: Record<TournamentMode, number> = {
 } as const;
 
 export const FundingType = {
+  FREE: 'free',
+  ORGANIZER_FUNDED: 'organizer_funded',
   F48_SPONSORED: 'f48_sponsored',
   ENTRY_FEE: 'entry_fee',
 } as const;

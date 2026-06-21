@@ -16,7 +16,21 @@ export class TournamentQueryService {
       where: { id: tournamentId, isDeleted: false },
       include: {
         organizer: {
-          select: { id: true, displayName: true, verificationStatus: true },
+          select: {
+            id: true,
+            displayName: true,
+            verificationStatus: true,
+            youtubeChannels: {
+              where: { status: 'active' },
+              take: 1,
+              select: {
+                channelName: true,
+                handle: true,
+                url: true,
+                imageUrl: true,
+              },
+            },
+          },
         },
         stages: { orderBy: { stageOrder: 'asc' } },
         configVersions: {
@@ -66,7 +80,22 @@ export class TournamentQueryService {
           scheduledStartAt: true,
           bannerAssetId: true,
           createdAt: true,
-          organizer: { select: { id: true, displayName: true } },
+          organizer: {
+            select: {
+              id: true,
+              displayName: true,
+              youtubeChannels: {
+                where: { status: 'active' },
+                take: 1,
+                select: {
+                  channelName: true,
+                  handle: true,
+                  url: true,
+                  imageUrl: true,
+                },
+              },
+            },
+          },
         },
         orderBy: { createdAt: 'desc' },
         skip: (filters.page - 1) * filters.limit,

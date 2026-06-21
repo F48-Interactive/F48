@@ -16,10 +16,9 @@ const ACTIVE_TOURNAMENT_STATUSES = [
   'registration_closed',
   'check_in',
   'live',
-  'results_pending',
+  'provisional_results',
   'dispute_window',
   'results_final',
-  'settlement',
 ] as const;
 
 @Injectable()

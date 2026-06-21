@@ -278,18 +278,14 @@ model IdempotencyKey {
 
 enum TournamentStatus {
   draft
-  submitted
-  changes_required
-  approved
   published
   registration_open
   registration_closed
   check_in
   live
-  results_pending
+  provisional_results
   dispute_window
   results_final
-  settlement
   completed
   canceled
   voided
@@ -303,6 +299,8 @@ enum TournamentMode {
 }
 
 enum FundingType {
+  free
+  organizer_funded
   f48_sponsored
   entry_fee
 }
@@ -824,4 +822,3 @@ model AdminAction {
   @@index([targetType, targetId])
   @@map("admin_actions")
 }
-

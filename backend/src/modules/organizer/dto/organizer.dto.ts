@@ -11,7 +11,8 @@ export const CreateOrganizerSchema = z.object({
   displayName: z
     .string()
     .min(2, 'Display name must be at least 2 characters')
-    .max(50, 'Display name cannot exceed 50 characters'),
+    .max(50, 'Display name cannot exceed 50 characters')
+    .optional(),
   description: z
     .string()
     .max(500, 'Description cannot exceed 500 characters')

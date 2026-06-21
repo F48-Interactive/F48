@@ -10,6 +10,10 @@ import type {
   TiebreakConfigInput,
   UpdateTournamentInput,
 } from '../modules/tournament/dto/tournament.dto.js';
+import {
+  assertFundingShape,
+  requiresPrizePool,
+} from './tournament-funding-policy.js';
 
 type TournamentMode = 'solo' | 'duo' | 'squad';
 
@@ -31,10 +35,9 @@ const PUBLIC_TOURNAMENT_STATUSES: readonly string[] = [
   'registration_closed',
   'check_in',
   'live',
-  'results_pending',
+  'provisional_results',
   'dispute_window',
   'results_final',
-  'settlement',
   'completed',
 ];
 
@@ -58,7 +61,11 @@ export class TournamentAuthorityService {
 
   assertCreateInput(data: CreateTournamentInput): void {
     this.assertModeCapacity(data.mode, data.maxUnits);
-    this.assertFundingShape(data.fundingType, data.entryFeePaise);
+    assertFundingShape(
+      data.fundingType,
+      data.entryFeePaise,
+      data.prizePoolPaise,
+    );
     this.assertScheduleShape(
       data.registrationOpenAt,
       data.registrationCloseAt,
@@ -72,17 +79,21 @@ export class TournamentAuthorityService {
       maxUnits: number;
       fundingType: string;
       entryFeePaise: bigint | null;
+      prizePoolPaise: bigint;
     },
     data: UpdateTournamentInput,
   ): void {
     const nextMode = data.mode ?? existing.mode;
     const nextMaxUnits = data.maxUnits ?? existing.maxUnits;
+    const nextFundingType = data.fundingType ?? existing.fundingType;
     const nextEntryFee =
       data.entryFeePaise ??
       (existing.entryFeePaise ? Number(existing.entryFeePaise) : undefined);
+    const nextPrizePool =
+      data.prizePoolPaise ?? Number(existing.prizePoolPaise);
 
     this.assertModeCapacity(nextMode, nextMaxUnits);
-    this.assertFundingShape(existing.fundingType, nextEntryFee);
+    assertFundingShape(nextFundingType, nextEntryFee, nextPrizePool);
     this.assertScheduleShape(
       data.registrationOpenAt,
       data.registrationCloseAt,
@@ -264,7 +275,7 @@ export class TournamentAuthorityService {
     tournamentId: string,
     action: string,
   ): Promise<void> {
-    if (action === 'open_registration') {
+    if (action === 'publish' || action === 'open_registration') {
       const tournament = await this.prisma.tournament.findUnique({
         where: { id: tournamentId },
       });
@@ -272,17 +283,24 @@ export class TournamentAuthorityService {
       if (!tournament?.activeConfigVersionId) {
         throw new BadRequestError(
           ErrorCodes.VALIDATION_FAILED,
-          'Active scoring config is required before registration opens.',
+          'Active scoring config is required before publishing.',
+        );
+      }
+
+      if (tournament.fundingType === 'entry_fee') {
+        throw new BadRequestError(
+          ErrorCodes.FEATURE_DISABLED,
+          'Entry-fee tournaments are disabled until wallet support is enabled.',
         );
       }
 
       if (
-        tournament.fundingType === 'f48_sponsored' &&
+        requiresPrizePool(tournament.fundingType) &&
         tournament.prizePoolPaise <= 0n
       ) {
         throw new BadRequestError(
           ErrorCodes.PRIZE_POOL_MISMATCH,
-          'Sponsored prize pool must be approved before registration opens.',
+          'Prize pool must be set before this tournament can open.',
         );
       }
     }
@@ -362,25 +380,6 @@ export class TournamentAuthorityService {
       throw new BadRequestError(
         ErrorCodes.CAPACITY_EXCEEDED,
         `${mode} tournaments must use exactly ${expected} units.`,
-      );
-    }
-  }
-
-  private assertFundingShape(
-    fundingType: string,
-    entryFeePaise?: number,
-  ): void {
-    if (fundingType === 'entry_fee') {
-      throw new BadRequestError(
-        ErrorCodes.FEATURE_DISABLED,
-        'Entry-fee tournaments are disabled until wallet support is enabled.',
-      );
-    }
-
-    if (fundingType === 'f48_sponsored' && entryFeePaise && entryFeePaise > 0) {
-      throw new BadRequestError(
-        ErrorCodes.INVALID_AMOUNT,
-        'F48-sponsored tournaments must not have an entry fee.',
       );
     }
   }

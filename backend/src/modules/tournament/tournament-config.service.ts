@@ -26,9 +26,7 @@ export class TournamentConfigService {
   ) {
     const tournament = await this.assertOwnership(user, tournamentId);
 
-    if (
-      !['draft', 'changes_required', 'approved'].includes(tournament.status)
-    ) {
+    if (!['draft', 'published'].includes(tournament.status)) {
       throw new BadRequestError(
         ErrorCodes.VALIDATION_FAILED,
         `Cannot change scoring config in ${tournament.status} status.`,

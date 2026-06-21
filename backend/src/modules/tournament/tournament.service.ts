@@ -36,6 +36,12 @@ export class TournamentService {
 
     const organizer = await this.prisma.organizer.findUnique({
       where: { userId: user.id },
+      include: {
+        youtubeChannels: {
+          where: { status: 'active' },
+          take: 1,
+        },
+      },
     });
     if (!organizer) {
       throw new ForbiddenError(
@@ -43,10 +49,10 @@ export class TournamentService {
         'Organizer profile required.',
       );
     }
-    if (organizer.verificationStatus !== 'verified') {
+    if (organizer.youtubeChannels.length === 0) {
       throw new ForbiddenError(
         ErrorCodes.FORBIDDEN,
-        'Organizer must be verified.',
+        'Connect a YouTube channel before creating tournaments.',
       );
     }
 
@@ -61,6 +67,9 @@ export class TournamentService {
         scoringModel: data.scoringModel,
         maxUnits: data.maxUnits,
         entryFeePaise: data.entryFeePaise ? BigInt(data.entryFeePaise) : null,
+        prizePoolPaise: data.prizePoolPaise
+          ? BigInt(data.prizePoolPaise)
+          : 0n,
         scheduledStartAt: data.scheduledStartAt
           ? new Date(data.scheduledStartAt)
           : null,
@@ -102,10 +111,7 @@ export class TournamentService {
     );
     this.authority.assertUpdateInput(tournament, data);
 
-    if (
-      tournament.status !== 'draft' &&
-      tournament.status !== 'changes_required'
-    ) {
+    if (tournament.status !== 'draft') {
       throw new BadRequestError(
         ErrorCodes.VALIDATION_FAILED,
         `Cannot edit tournament in ${tournament.status} status.`,
@@ -120,9 +126,15 @@ export class TournamentService {
           description: data.description,
         }),
         ...(data.mode !== undefined && { mode: data.mode }),
+        ...(data.fundingType !== undefined && {
+          fundingType: data.fundingType,
+        }),
         ...(data.maxUnits !== undefined && { maxUnits: data.maxUnits }),
         ...(data.entryFeePaise !== undefined && {
           entryFeePaise: BigInt(data.entryFeePaise),
+        }),
+        ...(data.prizePoolPaise !== undefined && {
+          prizePoolPaise: BigInt(data.prizePoolPaise),
         }),
         ...(data.scheduledStartAt !== undefined && {
           scheduledStartAt: new Date(data.scheduledStartAt),
