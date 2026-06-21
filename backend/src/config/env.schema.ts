@@ -56,7 +56,7 @@ export const envSchema = z.object({
 
   CORS_ORIGINS: z
     .string()
-    .default('http://localhost:3001')
+    .default('http://localhost:3001,http://localhost:5173')
     .transform((val) => val.split(',').map((s) => s.trim())),
 
   THROTTLE_TTL_SECONDS: z.coerce.number().int().positive().default(60),

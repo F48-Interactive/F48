@@ -1,0 +1,68 @@
+.app-shell {
+  display: flex;
+  min-height: 100vh;
+}
+
+.mobile-topbar {
+  display: none;
+}
+
+.sidebar-backdrop {
+  display: none;
+}
+
+.app-main {
+  flex: 1;
+  margin-left: var(--sidebar-width);
+  padding: var(--space-8);
+  min-height: 100vh;
+  animation: fade-in 0.3s var(--ease);
+}
+
+@media (max-width: 768px) {
+  .mobile-topbar {
+    position: fixed;
+    inset: 0 0 auto 0;
+    height: var(--topbar-height);
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    padding: 0 var(--space-4);
+    background: var(--bg-surface-1);
+    border-bottom: 1px solid var(--border);
+    z-index: 40;
+  }
+
+  .mobile-menu-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    background: var(--bg-surface-2);
+    color: var(--text-primary);
+  }
+
+  .mobile-topbar-logo {
+    font-size: 1.125rem;
+    font-weight: 700;
+    color: var(--primary);
+  }
+
+  .sidebar-backdrop {
+    position: fixed;
+    inset: 0;
+    display: block;
+    border: 0;
+    background: rgba(0, 0, 0, 0.56);
+    z-index: 45;
+  }
+
+  .app-main {
+    margin-left: 0;
+    padding: var(--space-4);
+    padding-top: calc(var(--topbar-height) + var(--space-4));
+  }
+}

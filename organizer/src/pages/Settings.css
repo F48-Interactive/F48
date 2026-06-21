@@ -1,0 +1,52 @@
+.settings-section h3 {
+  margin-bottom: var(--space-4);
+}
+
+.settings-field {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.settings-field:last-child { border-bottom: none; }
+
+.settings-field-label {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+}
+.settings-field-value {
+  font-size: 0.875rem;
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.channel-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  background: var(--bg-surface-2);
+  border-radius: var(--radius-md);
+  margin-bottom: var(--space-2);
+}
+.channel-item-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.channel-item-name {
+  font-weight: 500;
+  font-size: 0.9375rem;
+}
+
+.settings-add-channel {
+  display: flex;
+  gap: var(--space-3);
+  align-items: flex-start;
+  flex-wrap: wrap;
+  margin-top: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border-subtle);
+}

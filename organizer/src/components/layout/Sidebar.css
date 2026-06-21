@@ -1,0 +1,122 @@
+.sidebar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: var(--sidebar-width);
+  height: 100vh;
+  background: var(--bg-surface-1);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  z-index: 50;
+}
+
+.sidebar-logo {
+  padding: var(--space-6) var(--space-6) var(--space-4);
+}
+
+.sidebar-logo-text {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--primary);
+  letter-spacing: -0.03em;
+}
+
+.sidebar-nav {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--space-3) var(--space-3);
+}
+
+.sidebar-link {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 10px var(--space-4);
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+  font-weight: 500;
+  text-decoration: none;
+  transition: all var(--duration-fast) var(--ease);
+  border-left: 3px solid transparent;
+}
+.sidebar-link:hover {
+  color: var(--text-primary);
+  background: var(--bg-surface-2);
+}
+.sidebar-link-active {
+  color: var(--primary);
+  background: var(--primary-muted);
+  border-left-color: var(--primary);
+}
+
+.sidebar-footer {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-4);
+  border-top: 1px solid var(--border);
+}
+
+.sidebar-user {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.sidebar-user-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.sidebar-user-name {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sidebar-user-role {
+  font-size: 0.6875rem;
+  color: var(--text-muted);
+}
+
+.sidebar-logout {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all var(--duration-fast) var(--ease);
+  flex-shrink: 0;
+}
+.sidebar-logout:hover {
+  color: var(--error);
+  background: var(--error-muted);
+}
+
+@media (max-width: 768px) {
+  .sidebar {
+    transform: translateX(-100%);
+    transition: transform var(--duration-normal) var(--ease);
+    z-index: 60;
+  }
+
+  .sidebar-open {
+    transform: translateX(0);
+    box-shadow: var(--shadow-lg);
+  }
+}
