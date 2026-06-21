@@ -26,6 +26,11 @@ import { AuditModule } from './modules/audit/audit.module.js';
 import { FeatureFlagModule } from './modules/feature-flag/feature-flag.module.js';
 import { RealtimeModule } from './realtime/realtime.module.js';
 
+// Phase 1: Identity & Auth
+import { AuthModule } from './modules/auth/auth.module.js';
+import { PlayerModule } from './modules/player/player.module.js';
+import { OrganizerModule } from './modules/organizer/organizer.module.js';
+
 // Providers
 import { ProviderModule } from './providers/provider.module.js';
 
@@ -96,6 +101,11 @@ import { ProviderModule } from './providers/provider.module.js';
     RealtimeModule,
     ProviderModule.register(),
     HealthModule,
+
+    // Phase 1: Identity & Auth
+    AuthModule,
+    PlayerModule,
+    OrganizerModule,
   ],
 
   providers: [
