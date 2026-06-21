@@ -5,7 +5,6 @@ import {
   Delete,
   Body,
   Param,
-  UsePipes,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { MediaService } from './media.service.js';
@@ -26,10 +25,10 @@ export class MediaController {
 
   @Post('register')
   @ApiOperation({ summary: 'Register externally hosted media URL' })
-  @UsePipes(new ZodValidationPipe(RegisterMediaAssetSchema))
   async registerAsset(
     @CurrentUser() user: RequestUser,
-    @Body() body: RegisterMediaAssetInput,
+    @Body(new ZodValidationPipe(RegisterMediaAssetSchema))
+    body: RegisterMediaAssetInput,
   ) {
     return this.mediaService.registerAsset({
       uploaderId: user.id,

@@ -10,7 +10,6 @@ import {
   Body,
   Param,
   Query,
-  UsePipes,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { TournamentService } from './tournament.service.js';
@@ -46,8 +45,10 @@ export class TournamentController {
   @Post()
   @Idempotent()
   @ApiOperation({ summary: 'Create tournament draft' })
-  @UsePipes(new ZodValidationPipe(CreateTournamentSchema))
-  async create(@CurrentUser() user: RequestUser, @Body() body: any) {
+  async create(
+    @CurrentUser() user: RequestUser,
+    @Body(new ZodValidationPipe(CreateTournamentSchema)) body: any,
+  ) {
     this.access.assertActiveUser(user);
     return this.tournamentService.create(user, body);
   }
@@ -88,11 +89,10 @@ export class TournamentController {
 
   @Patch(':id')
   @ApiOperation({ summary: 'Update tournament draft' })
-  @UsePipes(new ZodValidationPipe(UpdateTournamentSchema))
   async update(
     @CurrentUser() user: RequestUser,
     @Param('id') id: string,
-    @Body() body: any,
+    @Body(new ZodValidationPipe(UpdateTournamentSchema)) body: any,
   ) {
     this.access.assertActiveUser(user);
     return this.tournamentService.update(user, id, body);
@@ -101,11 +101,11 @@ export class TournamentController {
   @Post(':id/transition')
   @Idempotent()
   @ApiOperation({ summary: 'Transition tournament status' })
-  @UsePipes(new ZodValidationPipe(TransitionTournamentSchema))
   async transition(
     @CurrentUser() user: RequestUser,
     @Param('id') id: string,
-    @Body() body: { action: string; reason?: string },
+    @Body(new ZodValidationPipe(TransitionTournamentSchema))
+    body: { action: string; reason?: string },
   ) {
     this.access.assertActiveUser(user);
     return this.tournamentService.transition(
@@ -119,11 +119,10 @@ export class TournamentController {
   @Post(':id/scoring-config')
   @Idempotent()
   @ApiOperation({ summary: 'Set scoring config (creates new version)' })
-  @UsePipes(new ZodValidationPipe(ScoringConfigSchema))
   async setScoringConfig(
     @CurrentUser() user: RequestUser,
     @Param('id') id: string,
-    @Body() body: any,
+    @Body(new ZodValidationPipe(ScoringConfigSchema)) body: any,
   ) {
     this.access.assertActiveUser(user);
     return this.tournamentConfig.setScoringConfig(user, id, body);
@@ -132,12 +131,11 @@ export class TournamentController {
   @Post(':id/config/:configVersionId/prizes')
   @Idempotent()
   @ApiOperation({ summary: 'Set prize rules for config version' })
-  @UsePipes(new ZodValidationPipe(PrizeConfigSchema))
   async setPrizeConfig(
     @CurrentUser() user: RequestUser,
     @Param('id') id: string,
     @Param('configVersionId') configVersionId: string,
-    @Body() body: any,
+    @Body(new ZodValidationPipe(PrizeConfigSchema)) body: any,
   ) {
     this.access.assertActiveUser(user);
     return this.tournamentConfig.setPrizeConfig(
@@ -151,12 +149,11 @@ export class TournamentController {
   @Post(':id/config/:configVersionId/tiebreaks')
   @Idempotent()
   @ApiOperation({ summary: 'Set tiebreak rules for config version' })
-  @UsePipes(new ZodValidationPipe(TiebreakConfigSchema))
   async setTiebreakConfig(
     @CurrentUser() user: RequestUser,
     @Param('id') id: string,
     @Param('configVersionId') configVersionId: string,
-    @Body() body: any,
+    @Body(new ZodValidationPipe(TiebreakConfigSchema)) body: any,
   ) {
     this.access.assertActiveUser(user);
     return this.tournamentConfig.setTiebreakConfig(

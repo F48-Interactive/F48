@@ -6,7 +6,6 @@ import {
   Body,
   Param,
   Query,
-  UsePipes,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { DisputeService } from './dispute.service.js';
@@ -31,10 +30,9 @@ export class DisputeController {
   @Post()
   @Idempotent()
   @ApiOperation({ summary: 'File a dispute' })
-  @UsePipes(new ZodValidationPipe(FileDisputeSchema))
   async fileDispute(
     @CurrentUser() user: RequestUser,
-    @Body() body: FileDisputeInput,
+    @Body(new ZodValidationPipe(FileDisputeSchema)) body: FileDisputeInput,
   ) {
     return this.disputeService.fileDispute(
       user,
@@ -48,11 +46,11 @@ export class DisputeController {
   @Patch(':id/transition')
   @Roles('admin', 'super_admin')
   @ApiOperation({ summary: 'Admin: transition dispute status' })
-  @UsePipes(new ZodValidationPipe(TransitionDisputeSchema))
   async transition(
     @CurrentUser() admin: RequestUser,
     @Param('id') id: string,
-    @Body() body: TransitionDisputeInput,
+    @Body(new ZodValidationPipe(TransitionDisputeSchema))
+    body: TransitionDisputeInput,
   ) {
     return this.disputeService.transitionDispute(
       admin,

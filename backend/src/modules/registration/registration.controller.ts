@@ -5,7 +5,6 @@ import {
   Body,
   Param,
   Query,
-  UsePipes,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { RegistrationService } from './registration.service.js';
@@ -30,10 +29,10 @@ export class RegistrationController {
   @Post('solo')
   @Idempotent()
   @ApiOperation({ summary: 'Register as solo player' })
-  @UsePipes(new ZodValidationPipe(RegisterSoloSchema))
   async registerSolo(
     @CurrentUser() user: RequestUser,
-    @Body() body: { tournamentId: string },
+    @Body(new ZodValidationPipe(RegisterSoloSchema))
+    body: { tournamentId: string },
   ) {
     return this.registrationService.registerSolo(user, body.tournamentId);
   }
@@ -41,10 +40,9 @@ export class RegistrationController {
   @Post('team')
   @Idempotent()
   @ApiOperation({ summary: 'Register as team' })
-  @UsePipes(new ZodValidationPipe(RegisterTeamSchema))
   async registerTeam(
     @CurrentUser() user: RequestUser,
-    @Body()
+    @Body(new ZodValidationPipe(RegisterTeamSchema))
     body: {
       tournamentId: string;
       memberPlayerIds: string[];
@@ -80,11 +78,11 @@ export class RegistrationController {
   @Post(':id/invite-response')
   @Idempotent()
   @ApiOperation({ summary: 'Respond to team invite' })
-  @UsePipes(new ZodValidationPipe(TeamInviteResponseSchema))
   async respondToInvite(
     @CurrentUser() user: RequestUser,
     @Param('id') registrationId: string,
-    @Body() body: { response: 'accepted' | 'declined' },
+    @Body(new ZodValidationPipe(TeamInviteResponseSchema))
+    body: { response: 'accepted' | 'declined' },
   ) {
     return this.registrationService.respondToInvite(
       user,

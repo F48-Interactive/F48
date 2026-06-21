@@ -10,7 +10,6 @@ import {
   Body,
   Param,
   Query,
-  UsePipes,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { PlayerService } from './player.service.js';
@@ -46,10 +45,9 @@ export class PlayerController {
 
   @Post('profile')
   @ApiOperation({ summary: 'Create player profile (auto-generates Platform ID)' })
-  @UsePipes(new ZodValidationPipe(CreatePlayerSchema))
   async createProfile(
     @CurrentUser() user: RequestUser,
-    @Body() body: { username: string },
+    @Body(new ZodValidationPipe(CreatePlayerSchema)) body: { username: string },
   ) {
     this.assertActive(user);
     return this.playerService.createProfile(user.id, body);
@@ -63,10 +61,10 @@ export class PlayerController {
 
   @Patch('profile')
   @ApiOperation({ summary: 'Update player username or display name' })
-  @UsePipes(new ZodValidationPipe(UpdatePlayerSchema))
   async updateProfile(
     @CurrentUser() user: RequestUser,
-    @Body() body: { username?: string; displayName?: string },
+    @Body(new ZodValidationPipe(UpdatePlayerSchema))
+    body: { username?: string; displayName?: string },
   ) {
     this.assertActive(user);
     return this.playerService.updateProfile(user.id, body);
@@ -74,10 +72,9 @@ export class PlayerController {
 
   @Post('ff-lookup')
   @ApiOperation({ summary: 'Lookup Free Fire UID via Games Kinbo (rate-limited)' })
-  @UsePipes(new ZodValidationPipe(FfLookupSchema))
   async ffLookup(
     @CurrentUser() user: RequestUser,
-    @Body() body: { ffUid: string },
+    @Body(new ZodValidationPipe(FfLookupSchema)) body: { ffUid: string },
   ) {
     this.assertActive(user);
     // Need player ID for rate limiting
@@ -87,10 +84,10 @@ export class PlayerController {
 
   @Post('ff-bind')
   @ApiOperation({ summary: 'Confirm Free Fire UID binding' })
-  @UsePipes(new ZodValidationPipe(FfBindSchema))
   async ffBind(
     @CurrentUser() user: RequestUser,
-    @Body() body: { ffUid: string; ffNickname: string },
+    @Body(new ZodValidationPipe(FfBindSchema))
+    body: { ffUid: string; ffNickname: string },
   ) {
     this.assertActive(user);
     const player = await this.playerService.getProfile(user.id);

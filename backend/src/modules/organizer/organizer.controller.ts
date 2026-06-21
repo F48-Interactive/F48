@@ -10,7 +10,6 @@ import {
   Body,
   Param,
   Query,
-  UsePipes,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { OrganizerService } from './organizer.service.js';
@@ -49,10 +48,10 @@ export class OrganizerController {
 
   @Post('profile')
   @ApiOperation({ summary: 'Create organizer profile' })
-  @UsePipes(new ZodValidationPipe(CreateOrganizerSchema))
   async createProfile(
     @CurrentUser() user: RequestUser,
-    @Body() body: { displayName?: string; description?: string },
+    @Body(new ZodValidationPipe(CreateOrganizerSchema))
+    body: { displayName?: string; description?: string },
   ) {
     this.assertActive(user);
     return this.organizerService.createProfile(user.id, body);
@@ -66,10 +65,10 @@ export class OrganizerController {
 
   @Patch('profile')
   @ApiOperation({ summary: 'Update organizer profile' })
-  @UsePipes(new ZodValidationPipe(UpdateOrganizerSchema))
   async updateProfile(
     @CurrentUser() user: RequestUser,
-    @Body() body: { displayName?: string; description?: string; avatarAssetId?: string },
+    @Body(new ZodValidationPipe(UpdateOrganizerSchema))
+    body: { displayName?: string; description?: string; avatarAssetId?: string },
   ) {
     this.assertActive(user);
     return this.organizerService.updateProfile(user.id, body);
@@ -77,10 +76,9 @@ export class OrganizerController {
 
   @Post('youtube')
   @ApiOperation({ summary: 'Submit YouTube channel URL for server-side fetch' })
-  @UsePipes(new ZodValidationPipe(SubmitYoutubeSchema))
   async submitYoutube(
     @CurrentUser() user: RequestUser,
-    @Body() body: { channelUrl: string },
+    @Body(new ZodValidationPipe(SubmitYoutubeSchema)) body: { channelUrl: string },
   ) {
     this.assertActive(user);
     return this.organizerService.submitYoutubeChannel(
@@ -136,11 +134,11 @@ export class AdminOrganizerController {
   @Post(':id/verify')
   @Roles('admin', 'super_admin')
   @ApiOperation({ summary: 'Make verification decision for organizer' })
-  @UsePipes(new ZodValidationPipe(VerificationDecisionSchema))
   async verificationDecision(
     @Param('id') organizerId: string,
     @CurrentUser() admin: RequestUser,
-    @Body() body: { decision: string; reason: string; fundingEligibility?: string },
+    @Body(new ZodValidationPipe(VerificationDecisionSchema))
+    body: { decision: string; reason: string; fundingEligibility?: string },
   ) {
     return this.organizerService.adminVerificationDecision(
       organizerId,

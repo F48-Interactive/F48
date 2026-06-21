@@ -8,7 +8,6 @@ import {
   Body,
   Param,
   Query,
-  UsePipes,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { FundingService } from './funding.service.js';
@@ -35,10 +34,10 @@ export class FundingController {
   @Post('request')
   @Idempotent()
   @ApiOperation({ summary: 'Create funding request' })
-  @UsePipes(new ZodValidationPipe(CreateFundingRequestSchema))
   async createRequest(
     @CurrentUser() user: RequestUser,
-    @Body() body: { tournamentId: string; requestedPaise: number },
+    @Body(new ZodValidationPipe(CreateFundingRequestSchema))
+    body: { tournamentId: string; requestedPaise: number },
   ) {
     return this.fundingService.createRequest(
       user,
@@ -62,11 +61,11 @@ export class FundingController {
   @ElevatedAction()
   @Roles('admin', 'super_admin')
   @ApiOperation({ summary: 'Admin: review funding request' })
-  @UsePipes(new ZodValidationPipe(ReviewFundingRequestSchema))
   async review(
     @CurrentUser() admin: RequestUser,
     @Param('id') id: string,
-    @Body() body: { decision: any; approvedPaise?: number; notes?: string },
+    @Body(new ZodValidationPipe(ReviewFundingRequestSchema))
+    body: { decision: any; approvedPaise?: number; notes?: string },
   ) {
     return this.fundingService.adminReview(
       admin,

@@ -1,6 +1,8 @@
 import { createParamDecorator, type ExecutionContext } from '@nestjs/common';
 import type { FastifyRequest } from 'fastify';
 import type { UserRole } from '../../types/enums.js';
+import { UnauthorizedError } from '../../lib/errors.js';
+import { ErrorCodes } from '../constants/error-codes.js';
 
 /**
  * Shape of the authenticated user attached to the request by AuthGuard.
@@ -23,6 +25,15 @@ export interface RequestUser {
 export const CurrentUser = createParamDecorator(
   (_data: unknown, ctx: ExecutionContext): RequestUser => {
     const request = ctx.switchToHttp().getRequest<FastifyRequest>();
-    return (request as FastifyRequest & { user: RequestUser }).user;
+    const user = (request as FastifyRequest & { user?: RequestUser }).user;
+
+    if (!user) {
+      throw new UnauthorizedError(
+        ErrorCodes.AUTH_TOKEN_INVALID,
+        'Authentication required.',
+      );
+    }
+
+    return user;
   },
 );

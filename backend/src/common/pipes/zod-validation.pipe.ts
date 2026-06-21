@@ -21,7 +21,9 @@ import { ErrorCodes } from '../constants/error-codes.js';
 export class ZodValidationPipe implements PipeTransform {
   constructor(private readonly schema: ZodSchema) {}
 
-  transform(value: unknown, _metadata: ArgumentMetadata): unknown {
+  transform(value: unknown, metadata: ArgumentMetadata): unknown {
+    if (metadata.type !== 'body') return value;
+
     const result = this.schema.safeParse(value);
 
     if (!result.success) {
