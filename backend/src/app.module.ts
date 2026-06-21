@@ -6,8 +6,7 @@ import { LoggerModule } from 'nestjs-pino';
 // Config
 import { ConfigModule } from './config/config.module.js';
 import { DatabaseModule } from './config/database.module.js';
-import { RedisService } from './config/redis.service.js';
-import { FirebaseService } from './config/firebase.service.js';
+import { RuntimeModule } from './config/runtime.module.js';
 import { EnvService } from './config/env.service.js';
 
 // Common
@@ -124,6 +123,7 @@ import { ProviderModule } from './providers/provider.module.js';
     // ── Core Infrastructure ──
     ConfigModule,
     DatabaseModule,
+    RuntimeModule,
     AuditModule,
     FeatureFlagModule,
     DomainModule,
@@ -159,10 +159,6 @@ import { ProviderModule } from './providers/provider.module.js';
   ],
 
   providers: [
-    // ── Singleton Services ──
-    RedisService,
-    FirebaseService,
-
     // ── Global Interceptors (order matters) ──
     {
       provide: APP_INTERCEPTOR,
@@ -210,6 +206,6 @@ import { ProviderModule } from './providers/provider.module.js';
     },
   ],
 
-  exports: [RedisService, FirebaseService],
+  exports: [RuntimeModule],
 })
 export class AppModule {}

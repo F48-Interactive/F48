@@ -5,7 +5,7 @@ import { AuthService } from './auth.service.js';
 /**
  * Auth Module — provides Google login, session cookie management, and user lookup.
  * Depends on global modules: DatabaseModule (PrismaService), AuditModule (AuditService),
- * ConfigModule (EnvService), and AppModule (FirebaseService).
+ * ConfigModule (EnvService), and RuntimeModule (FirebaseService).
  */
 @Module({
   controllers: [AuthController],
