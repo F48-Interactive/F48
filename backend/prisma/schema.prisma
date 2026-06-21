@@ -707,9 +707,9 @@ model RegistrationMember {
 model RoomCredential {
   id          String   @id @default(uuid()) @db.Uuid
   matchId     String   @unique @map("match_id") @db.Uuid
-  roomId      String   @map("room_id") @db.VarChar(50)
-  roomPass    String   @map("room_pass") @db.VarChar(100)
-  customCode  String?  @map("custom_code") @db.VarChar(50)
+  roomId      String   @map("room_id")
+  roomPass    String   @map("room_pass")
+  customCode  String?  @map("custom_code")
   releasedAt  DateTime @default(now()) @map("released_at") @db.Timestamptz
 
   // Relations

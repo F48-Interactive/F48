@@ -1,8 +1,11 @@
 import { Controller, Post, Get, Body, Param, Query } from '@nestjs/common';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { MatchService } from './match.service.js';
-import { CurrentUser, type RequestUser } from '../../common/decorators/current-user.decorator.js';
-import { Public } from '../../common/decorators/index.js';
+import {
+  CurrentUser,
+  type RequestUser,
+} from '../../common/decorators/current-user.decorator.js';
+import { Idempotent, Public } from '../../common/decorators/index.js';
 
 @ApiTags('Matches')
 @Controller('matches')
@@ -10,13 +13,20 @@ export class MatchController {
   constructor(private readonly matchService: MatchService) {}
 
   @Post(':id/room-credentials')
+  @Idempotent()
   @ApiOperation({ summary: 'Set room credentials (organizer)' })
   async setRoomCredentials(
     @CurrentUser() user: RequestUser,
     @Param('id') id: string,
     @Body() body: { roomId: string; roomPass: string; customCode?: string },
   ) {
-    return this.matchService.setRoomCredentials(user, id, body.roomId, body.roomPass, body.customCode);
+    return this.matchService.setRoomCredentials(
+      user,
+      id,
+      body.roomId,
+      body.roomPass,
+      body.customCode,
+    );
   }
 
   @Get(':id/room-credentials')
@@ -29,6 +39,7 @@ export class MatchController {
   }
 
   @Post(':id/transition')
+  @Idempotent()
   @ApiOperation({ summary: 'Transition match status' })
   async transitionMatch(
     @CurrentUser() user: RequestUser,
@@ -39,18 +50,28 @@ export class MatchController {
   }
 
   @Post(':id/result')
+  @Idempotent()
   @ApiOperation({ summary: 'Submit match result' })
   async submitResult(
     @CurrentUser() user: RequestUser,
     @Param('id') id: string,
-    @Body() body: {
+    @Body()
+    body: {
       playerResults: Array<{
-        registrationId: string; placement: number; kills: number; isBooyah?: boolean;
+        registrationId: string;
+        placement: number;
+        kills: number;
+        isBooyah?: boolean;
       }>;
       evidenceAssetId?: string;
     },
   ) {
-    return this.matchService.submitResult(user, id, body.playerResults, body.evidenceAssetId);
+    return this.matchService.submitResult(
+      user,
+      id,
+      body.playerResults,
+      body.evidenceAssetId,
+    );
   }
 
   @Get(':id')

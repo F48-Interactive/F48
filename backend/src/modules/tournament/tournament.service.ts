@@ -9,7 +9,6 @@ import { StatusHistoryService } from '../audit/status-history.service.js';
 import { EventBusService } from '../../realtime/event-bus.service.js';
 import {
   NotFoundError,
-  ConflictError,
   ForbiddenError,
   BadRequestError,
 } from '../../lib/errors.js';
@@ -27,6 +26,8 @@ import type {
   PrizeConfigInput,
   TiebreakConfigInput,
 } from './dto/tournament.dto.js';
+import { TournamentAuthorityService } from '../../domain/tournament-authority.service.js';
+import { AccessAuthorityService } from '../../domain/access-authority.service.js';
 
 @Injectable()
 export class TournamentService {
@@ -37,19 +38,29 @@ export class TournamentService {
     private readonly audit: AuditService,
     private readonly statusHistory: StatusHistoryService,
     private readonly eventBus: EventBusService,
+    private readonly authority: TournamentAuthorityService,
+    private readonly access: AccessAuthorityService,
   ) {}
 
   // ─── Create Tournament (Draft) ──────────────────────────────────────────
   async create(user: RequestUser, data: CreateTournamentInput) {
+    this.authority.assertCreateInput(data);
+
     // Must have an organizer profile
     const organizer = await this.prisma.organizer.findUnique({
       where: { userId: user.id },
     });
     if (!organizer) {
-      throw new ForbiddenError(ErrorCodes.FORBIDDEN, 'Organizer profile required.');
+      throw new ForbiddenError(
+        ErrorCodes.FORBIDDEN,
+        'Organizer profile required.',
+      );
     }
     if (organizer.verificationStatus !== 'verified') {
-      throw new ForbiddenError(ErrorCodes.FORBIDDEN, 'Organizer must be verified.');
+      throw new ForbiddenError(
+        ErrorCodes.FORBIDDEN,
+        'Organizer must be verified.',
+      );
     }
 
     const tournament = await this.prisma.tournament.create({
@@ -63,9 +74,15 @@ export class TournamentService {
         scoringModel: data.scoringModel,
         maxUnits: data.maxUnits,
         entryFeePaise: data.entryFeePaise ? BigInt(data.entryFeePaise) : null,
-        scheduledStartAt: data.scheduledStartAt ? new Date(data.scheduledStartAt) : null,
-        registrationOpenAt: data.registrationOpenAt ? new Date(data.registrationOpenAt) : null,
-        registrationCloseAt: data.registrationCloseAt ? new Date(data.registrationCloseAt) : null,
+        scheduledStartAt: data.scheduledStartAt
+          ? new Date(data.scheduledStartAt)
+          : null,
+        registrationOpenAt: data.registrationOpenAt
+          ? new Date(data.registrationOpenAt)
+          : null,
+        registrationCloseAt: data.registrationCloseAt
+          ? new Date(data.registrationCloseAt)
+          : null,
         checkInDurationMin: data.checkInDurationMin,
         disputeWindowHours: data.disputeWindowHours ?? 24,
         gameMapId: data.gameMapId,
@@ -92,12 +109,18 @@ export class TournamentService {
     const tournament = await this.prisma.tournament.findFirst({
       where: { id: tournamentId, isDeleted: false },
       include: {
-        organizer: { select: { id: true, displayName: true, verificationStatus: true } },
+        organizer: {
+          select: { id: true, displayName: true, verificationStatus: true },
+        },
         stages: { orderBy: { stageOrder: 'asc' } },
         configVersions: {
           orderBy: { versionNumber: 'desc' },
           take: 1,
-          include: { placementPoints: true, prizeRules: true, tiebreakRules: true },
+          include: {
+            placementPoints: true,
+            prizeRules: true,
+            tiebreakRules: true,
+          },
         },
         fundingRequest: true,
         gameMap: true,
@@ -105,17 +128,28 @@ export class TournamentService {
     });
 
     if (!tournament) {
-      throw new NotFoundError(ErrorCodes.RESOURCE_NOT_FOUND, 'Tournament not found.');
+      throw new NotFoundError(
+        ErrorCodes.RESOURCE_NOT_FOUND,
+        'Tournament not found.',
+      );
     }
 
     return tournament;
   }
 
   // ─── Update Tournament (Draft/Changes Required) ─────────────────────────
-  async update(user: RequestUser, tournamentId: string, data: UpdateTournamentInput) {
+  async update(
+    user: RequestUser,
+    tournamentId: string,
+    data: UpdateTournamentInput,
+  ) {
     const tournament = await this.assertOwnership(user, tournamentId);
+    this.authority.assertUpdateInput(tournament, data);
 
-    if (tournament.status !== 'draft' && tournament.status !== 'changes_required') {
+    if (
+      tournament.status !== 'draft' &&
+      tournament.status !== 'changes_required'
+    ) {
       throw new BadRequestError(
         ErrorCodes.VALIDATION_FAILED,
         `Cannot edit tournament in ${tournament.status} status.`,
@@ -126,18 +160,34 @@ export class TournamentService {
       where: { id: tournamentId },
       data: {
         ...(data.title !== undefined && { title: data.title }),
-        ...(data.description !== undefined && { description: data.description }),
+        ...(data.description !== undefined && {
+          description: data.description,
+        }),
         ...(data.mode !== undefined && { mode: data.mode }),
         ...(data.maxUnits !== undefined && { maxUnits: data.maxUnits }),
-        ...(data.entryFeePaise !== undefined && { entryFeePaise: BigInt(data.entryFeePaise) }),
-        ...(data.scheduledStartAt !== undefined && { scheduledStartAt: new Date(data.scheduledStartAt) }),
-        ...(data.registrationOpenAt !== undefined && { registrationOpenAt: new Date(data.registrationOpenAt) }),
-        ...(data.registrationCloseAt !== undefined && { registrationCloseAt: new Date(data.registrationCloseAt) }),
-        ...(data.checkInDurationMin !== undefined && { checkInDurationMin: data.checkInDurationMin }),
-        ...(data.disputeWindowHours !== undefined && { disputeWindowHours: data.disputeWindowHours }),
+        ...(data.entryFeePaise !== undefined && {
+          entryFeePaise: BigInt(data.entryFeePaise),
+        }),
+        ...(data.scheduledStartAt !== undefined && {
+          scheduledStartAt: new Date(data.scheduledStartAt),
+        }),
+        ...(data.registrationOpenAt !== undefined && {
+          registrationOpenAt: new Date(data.registrationOpenAt),
+        }),
+        ...(data.registrationCloseAt !== undefined && {
+          registrationCloseAt: new Date(data.registrationCloseAt),
+        }),
+        ...(data.checkInDurationMin !== undefined && {
+          checkInDurationMin: data.checkInDurationMin,
+        }),
+        ...(data.disputeWindowHours !== undefined && {
+          disputeWindowHours: data.disputeWindowHours,
+        }),
         ...(data.gameMapId !== undefined && { gameMapId: data.gameMapId }),
         ...(data.rulesText !== undefined && { rulesText: data.rulesText }),
-        ...(data.bannerAssetId !== undefined && { bannerAssetId: data.bannerAssetId }),
+        ...(data.bannerAssetId !== undefined && {
+          bannerAssetId: data.bannerAssetId,
+        }),
       },
     });
 
@@ -151,19 +201,10 @@ export class TournamentService {
     action: string,
     reason?: string,
   ) {
-    const tournament = await this.prisma.tournament.findFirst({
-      where: { id: tournamentId, isDeleted: false },
-      include: { organizer: true },
-    });
-
-    if (!tournament) {
-      throw new NotFoundError(ErrorCodes.RESOURCE_NOT_FOUND, 'Tournament not found.');
-    }
-
-    // Organizer can only transition their own tournaments
-    if (user.role === 'organizer' && tournament.organizer.userId !== user.id) {
-      throw new ForbiddenError(ErrorCodes.FORBIDDEN, 'Not your tournament.');
-    }
+    const tournament = await this.access.assertTournamentManager(
+      user,
+      tournamentId,
+    );
 
     const currentState = tournament.status as TournamentState;
     const newState = tournamentStateMachine.transition(
@@ -171,6 +212,7 @@ export class TournamentService {
       action as TournamentAction,
       { role: user.role as any, reason },
     );
+    await this.authority.assertTransitionPrerequisites(tournamentId, action);
 
     const updated = await this.prisma.tournament.update({
       where: { id: tournamentId },
@@ -210,20 +252,30 @@ export class TournamentService {
       },
     });
 
-    this.logger.log({ tournamentId, from: currentState, to: newState, action }, 'Tournament transitioned');
+    this.logger.log(
+      { tournamentId, from: currentState, to: newState, action },
+      'Tournament transitioned',
+    );
     return updated;
   }
 
   // ─── Scoring Config Versioning (DATA-005, SCORE-009) ────────────────────
-  async setScoringConfig(user: RequestUser, tournamentId: string, data: ScoringConfigInput) {
+  async setScoringConfig(
+    user: RequestUser,
+    tournamentId: string,
+    data: ScoringConfigInput,
+  ) {
     const tournament = await this.assertOwnership(user, tournamentId);
 
-    if (!['draft', 'changes_required', 'approved'].includes(tournament.status)) {
+    if (
+      !['draft', 'changes_required', 'approved'].includes(tournament.status)
+    ) {
       throw new BadRequestError(
         ErrorCodes.VALIDATION_FAILED,
         `Cannot change scoring config in ${tournament.status} status.`,
       );
     }
+    this.authority.assertScoringConfig(tournament, data);
 
     // Get next version number
     const lastConfig = await this.prisma.tournamentConfigVersion.findFirst({
@@ -251,90 +303,132 @@ export class TournamentService {
     // Set as active config
     await this.prisma.tournament.update({
       where: { id: tournamentId },
-      data: { activeConfigVersionId: config.id, scoringModel: data.scoringModel },
+      data: {
+        activeConfigVersionId: config.id,
+        scoringModel: data.scoringModel,
+      },
     });
 
     return config;
   }
 
   // ─── Prize Config ──────────────────────────────────────────────────────
-  async setPrizeConfig(user: RequestUser, tournamentId: string, configVersionId: string, data: PrizeConfigInput) {
-    await this.assertOwnership(user, tournamentId);
+  async setPrizeConfig(
+    user: RequestUser,
+    tournamentId: string,
+    configVersionId: string,
+    data: PrizeConfigInput,
+  ) {
+    const tournament = await this.assertOwnership(user, tournamentId);
 
     const config = await this.prisma.tournamentConfigVersion.findFirst({
       where: { id: configVersionId, tournamentId },
     });
     if (!config) {
-      throw new NotFoundError(ErrorCodes.RESOURCE_NOT_FOUND, 'Config version not found.');
+      throw new NotFoundError(
+        ErrorCodes.RESOURCE_NOT_FOUND,
+        'Config version not found.',
+      );
     }
     if (config.isLocked) {
-      throw new BadRequestError(ErrorCodes.VALIDATION_FAILED, 'Config version is locked.');
+      throw new BadRequestError(
+        ErrorCodes.VALIDATION_FAILED,
+        'Config version is locked.',
+      );
     }
+    this.authority.assertPrizeConfig(tournament, data);
 
-    // Delete existing rules and recreate
-    await this.prisma.prizeRule.deleteMany({ where: { configVersionId } });
+    const rules = await this.prisma.$transaction(async (tx) => {
+      const db = tx as unknown as PrismaService;
+      await db.prizeRule.deleteMany({ where: { configVersionId } });
 
-    const rules = await Promise.all(
-      data.rules.map((r) =>
-        this.prisma.prizeRule.create({
-          data: {
-            configVersionId,
-            rankStart: r.rankStart,
-            rankEnd: r.rankEnd,
-            amountPaise: BigInt(r.amountPaise),
-          },
-        }),
-      ),
-    );
+      return Promise.all(
+        data.rules.map((r) =>
+          db.prizeRule.create({
+            data: {
+              configVersionId,
+              rankStart: r.rankStart,
+              rankEnd: r.rankEnd,
+              amountPaise: BigInt(r.amountPaise),
+            },
+          }),
+        ),
+      );
+    });
 
     return rules;
   }
 
   // ─── Tiebreak Config ───────────────────────────────────────────────────
-  async setTiebreakConfig(user: RequestUser, tournamentId: string, configVersionId: string, data: TiebreakConfigInput) {
+  async setTiebreakConfig(
+    user: RequestUser,
+    tournamentId: string,
+    configVersionId: string,
+    data: TiebreakConfigInput,
+  ) {
     await this.assertOwnership(user, tournamentId);
 
     const config = await this.prisma.tournamentConfigVersion.findFirst({
       where: { id: configVersionId, tournamentId },
     });
     if (!config) {
-      throw new NotFoundError(ErrorCodes.RESOURCE_NOT_FOUND, 'Config version not found.');
+      throw new NotFoundError(
+        ErrorCodes.RESOURCE_NOT_FOUND,
+        'Config version not found.',
+      );
     }
     if (config.isLocked) {
-      throw new BadRequestError(ErrorCodes.VALIDATION_FAILED, 'Config version is locked.');
+      throw new BadRequestError(
+        ErrorCodes.VALIDATION_FAILED,
+        'Config version is locked.',
+      );
     }
+    this.authority.assertTiebreakConfig(data);
 
-    await this.prisma.tiebreakRule.deleteMany({ where: { configVersionId } });
+    const rules = await this.prisma.$transaction(async (tx) => {
+      const db = tx as unknown as PrismaService;
+      await db.tiebreakRule.deleteMany({ where: { configVersionId } });
 
-    const rules = await Promise.all(
-      data.rules.map((r) =>
-        this.prisma.tiebreakRule.create({
-          data: {
-            configVersionId,
-            priority: r.priority,
-            field: r.field,
-          },
-        }),
-      ),
-    );
+      return Promise.all(
+        data.rules.map((r) =>
+          db.tiebreakRule.create({
+            data: {
+              configVersionId,
+              priority: r.priority,
+              field: r.field,
+            },
+          }),
+        ),
+      );
+    });
 
     return rules;
   }
 
   // ─── List Tournaments ──────────────────────────────────────────────────
-  async list(filters: { status?: string; mode?: string; page: number; limit: number }) {
-    const where: Record<string, unknown> = { isDeleted: false };
-    if (filters.status) where.status = filters.status;
-    if (filters.mode) where.mode = filters.mode;
+  async list(filters: {
+    status?: string;
+    mode?: string;
+    page: number;
+    limit: number;
+  }) {
+    const where = this.authority.publicListWhere(filters);
 
     const [items, total] = await Promise.all([
       this.prisma.tournament.findMany({
         where,
         select: {
-          id: true, title: true, mode: true, status: true,
-          fundingType: true, structureType: true, maxUnits: true,
-          prizePoolPaise: true, scheduledStartAt: true,
-          bannerAssetId: true, createdAt: true,
+          id: true,
+          title: true,
+          mode: true,
+          status: true,
+          fundingType: true,
+          structureType: true,
+          maxUnits: true,
+          prizePoolPaise: true,
+          scheduledStartAt: true,
+          bannerAssetId: true,
+          createdAt: true,
           organizer: { select: { id: true, displayName: true } },
         },
         orderBy: { createdAt: 'desc' },
@@ -354,9 +448,14 @@ export class TournamentService {
 
   // ─── My Tournaments (Organizer) ────────────────────────────────────────
   async listByOrganizer(userId: string, page: number, limit: number) {
-    const organizer = await this.prisma.organizer.findUnique({ where: { userId } });
+    const organizer = await this.prisma.organizer.findUnique({
+      where: { userId },
+    });
     if (!organizer) {
-      throw new NotFoundError(ErrorCodes.RESOURCE_NOT_FOUND, 'Organizer profile not found.');
+      throw new NotFoundError(
+        ErrorCodes.RESOURCE_NOT_FOUND,
+        'Organizer profile not found.',
+      );
     }
 
     const where = { organizerId: organizer.id, isDeleted: false };
@@ -375,24 +474,6 @@ export class TournamentService {
 
   // ─── Ownership Check ───────────────────────────────────────────────────
   private async assertOwnership(user: RequestUser, tournamentId: string) {
-    const tournament = await this.prisma.tournament.findFirst({
-      where: { id: tournamentId, isDeleted: false },
-      include: { organizer: true },
-    });
-
-    if (!tournament) {
-      throw new NotFoundError(ErrorCodes.RESOURCE_NOT_FOUND, 'Tournament not found.');
-    }
-
-    // Admins can edit any tournament
-    if (user.role === 'admin' || user.role === 'super_admin') {
-      return tournament;
-    }
-
-    if (tournament.organizer.userId !== user.id) {
-      throw new ForbiddenError(ErrorCodes.FORBIDDEN, 'Not your tournament.');
-    }
-
-    return tournament;
+    return this.access.assertTournamentManager(user, tournamentId);
   }
 }

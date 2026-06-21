@@ -19,12 +19,14 @@ import { IdempotencyInterceptor } from './common/interceptors/idempotency.interc
 import { FirebaseAuthGuard } from './common/guards/firebase-auth.guard.js';
 import { RolesGuard } from './common/guards/roles.guard.js';
 import { ElevatedActionGuard } from './common/guards/elevated-action.guard.js';
+import { FeatureGateGuard } from './modules/feature-flag/feature-flag.guard.js';
 
 // Modules
 import { HealthModule } from './modules/health/health.module.js';
 import { AuditModule } from './modules/audit/audit.module.js';
 import { FeatureFlagModule } from './modules/feature-flag/feature-flag.module.js';
 import { RealtimeModule } from './realtime/realtime.module.js';
+import { DomainModule } from './domain/domain.module.js';
 
 // Phase 1: Identity & Auth
 import { AuthModule } from './modules/auth/auth.module.js';
@@ -75,7 +77,10 @@ import { ProviderModule } from './providers/provider.module.js';
               'req.headers["x-csrf-token"]',
               'res.headers["set-cookie"]',
               'body.password',
+              'body.roomId',
+              'body.roomPass',
               'body.roomPassword',
+              'body.customCode',
               'body.roomCode',
               'body.apiKey',
               'body.privateKey',
@@ -90,7 +95,9 @@ import { ProviderModule } from './providers/provider.module.js';
             req: (req: Record<string, unknown>) => ({
               method: req['method'],
               url: req['url'],
-              correlationId: (req['headers'] as Record<string, string>)?.['x-correlation-id'],
+              correlationId: (req['headers'] as Record<string, string>)?.[
+                'x-correlation-id'
+              ],
             }),
             res: (res: Record<string, unknown>) => ({
               statusCode: res['statusCode'],
@@ -119,6 +126,7 @@ import { ProviderModule } from './providers/provider.module.js';
     DatabaseModule,
     AuditModule,
     FeatureFlagModule,
+    DomainModule,
     RealtimeModule,
     ProviderModule.register(),
     HealthModule,
@@ -191,6 +199,10 @@ import { ProviderModule } from './providers/provider.module.js';
     {
       provide: APP_GUARD,
       useClass: ElevatedActionGuard,
+    },
+    {
+      provide: APP_GUARD,
+      useClass: FeatureGateGuard,
     },
     {
       provide: APP_GUARD,

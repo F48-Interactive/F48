@@ -17,9 +17,7 @@ export class EnvService {
       const formatted = result.error.issues
         .map((issue) => `  ${issue.path.join('.')}: ${issue.message}`)
         .join('\n');
-      throw new Error(
-        `Invalid environment configuration:\n${formatted}`,
-      );
+      throw new Error(`Invalid environment configuration:\n${formatted}`);
     }
 
     this.config = result.data;
@@ -63,6 +61,10 @@ export class EnvService {
 
   get sessionSecret(): string {
     return this.config.SESSION_SECRET;
+  }
+
+  get roomCredentialsSecret(): string {
+    return this.config.ROOM_CREDENTIALS_SECRET ?? this.config.SESSION_SECRET;
   }
 
   get sessionMaxAgeMs(): number {

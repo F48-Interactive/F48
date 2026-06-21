@@ -3,16 +3,17 @@
  * DISPUTE-001 to DISPUTE-008.
  */
 import { Injectable, Logger } from '@nestjs/common';
+import { Prisma } from '../../generated/prisma/client.js';
 import { PrismaService } from '../../config/database.service.js';
 import { AuditService } from '../audit/audit.service.js';
 import { StatusHistoryService } from '../audit/status-history.service.js';
-import {
-  NotFoundError,
-  BadRequestError,
-  ForbiddenError,
-} from '../../lib/errors.js';
+import { NotFoundError, ForbiddenError } from '../../lib/errors.js';
 import { ErrorCodes } from '../../common/constants/error-codes.js';
 import type { RequestUser } from '../../common/decorators/current-user.decorator.js';
+import {
+  DisputeAuthorityService,
+  OPEN_DISPUTE_STATUSES,
+} from '../../domain/dispute-authority.service.js';
 
 @Injectable()
 export class DisputeService {
@@ -22,6 +23,7 @@ export class DisputeService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly statusHistory: StatusHistoryService,
+    private readonly authority: DisputeAuthorityService,
   ) {}
 
   /** File a dispute against a match result. */
@@ -32,48 +34,43 @@ export class DisputeService {
     description: string,
     evidenceAssetIds?: string[],
   ) {
-    // Verify match result exists and tournament is in dispute_window
-    const result = await this.prisma.matchResult.findUnique({
-      where: { id: matchResultId },
-      include: { match: { include: { tournament: true } } },
-    });
-    if (!result) {
-      throw new NotFoundError(ErrorCodes.RESOURCE_NOT_FOUND, 'Match result not found.');
-    }
-    if (result.match.tournament.status !== 'dispute_window') {
-      throw new BadRequestError(ErrorCodes.VALIDATION_FAILED, 'Dispute window is not open.');
-    }
+    const disputeCategory = this.authority.assertCategory(category);
+    const safeEvidenceAssetIds = evidenceAssetIds ?? [];
+    const { player } = await this.authority.getFilingContext(
+      user,
+      matchResultId,
+    );
+    await this.authority.assertEvidenceAssets(user, safeEvidenceAssetIds);
 
-    // Verify player was in this match
-    const player = await this.prisma.player.findUnique({ where: { userId: user.id } });
-    if (!player) {
-      throw new BadRequestError(ErrorCodes.VALIDATION_FAILED, 'Player profile required.');
-    }
+    const dispute = await this.prisma.$transaction(async (tx) => {
+      const db = tx as unknown as PrismaService;
 
-    const dispute = await this.prisma.dispute.create({
-      data: {
-        matchResultId,
-        filedByPlayerId: player.id,
-        category: category as any,
-        description,
-        evidenceAssetIds: evidenceAssetIds ?? [],
-        status: 'submitted',
-      },
-    });
+      const created = await db.dispute.create({
+        data: {
+          matchResultId,
+          filedByPlayerId: player.id,
+          category: disputeCategory,
+          description,
+          evidenceAssetIds: safeEvidenceAssetIds,
+          status: 'submitted',
+        },
+      });
 
-    // Also set match result status to disputed
-    await this.prisma.matchResult.update({
-      where: { id: matchResultId },
-      data: { status: 'disputed' },
+      await db.matchResult.update({
+        where: { id: matchResultId },
+        data: { status: 'disputed' },
+      });
+
+      return created;
     });
 
     await this.audit.log({
       actorId: user.id,
-      actorRole: 'player',
+      actorRole: user.role,
       action: 'dispute.filed',
       resourceType: 'dispute',
       resourceId: dispute.id,
-      newValue: { matchResultId, category },
+      newValue: { matchResultId, category: disputeCategory },
     });
 
     this.logger.log({ disputeId: dispute.id, matchResultId }, 'Dispute filed');
@@ -87,34 +84,67 @@ export class DisputeService {
     newStatus: string,
     resolution?: string,
   ) {
-    const dispute = await this.prisma.dispute.findUnique({ where: { id: disputeId } });
+    const dispute = await this.prisma.dispute.findUnique({
+      where: { id: disputeId },
+    });
     if (!dispute) {
-      throw new NotFoundError(ErrorCodes.RESOURCE_NOT_FOUND, 'Dispute not found.');
+      throw new NotFoundError(
+        ErrorCodes.RESOURCE_NOT_FOUND,
+        'Dispute not found.',
+      );
     }
 
     const previousStatus = dispute.status;
-    const updateData: Record<string, unknown> = { status: newStatus };
+    const nextStatus = this.authority.assertTransition(
+      previousStatus,
+      newStatus,
+      resolution,
+    );
+    const updateData: Record<string, unknown> = { status: nextStatus };
 
-    if (newStatus === 'under_review' && !dispute.adminAssignedId) {
+    if (nextStatus === 'under_review' && !dispute.adminAssignedId) {
       updateData.adminAssignedId = admin.id;
     }
     if (resolution) {
       updateData.resolution = resolution;
     }
-    if (newStatus.startsWith('resolved_')) {
+    if (nextStatus.startsWith('resolved_')) {
       updateData.resolvedAt = new Date();
     }
 
-    const updated = await this.prisma.dispute.update({
-      where: { id: disputeId },
-      data: updateData,
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const db = tx as unknown as PrismaService;
+      const saved = await db.dispute.update({
+        where: { id: disputeId },
+        data: updateData,
+      });
+
+      const resultStatus =
+        this.authority.nextResultStatusAfterDispute(nextStatus);
+      if (resultStatus) {
+        const openDisputes = await db.dispute.count({
+          where: {
+            matchResultId: dispute.matchResultId,
+            id: { not: disputeId },
+            status: { in: [...OPEN_DISPUTE_STATUSES] },
+          },
+        });
+        if (openDisputes === 0) {
+          await db.matchResult.update({
+            where: { id: dispute.matchResultId },
+            data: { status: resultStatus },
+          });
+        }
+      }
+
+      return saved;
     });
 
     await this.statusHistory.record({
       resourceType: 'dispute',
       resourceId: disputeId,
       previousStatus,
-      newStatus,
+      newStatus: nextStatus,
       actorId: admin.id,
       reason: resolution,
     });
@@ -126,7 +156,7 @@ export class DisputeService {
       resourceType: 'dispute',
       resourceId: disputeId,
       oldValue: { status: previousStatus },
-      newValue: { status: newStatus },
+      newValue: { status: nextStatus },
       reason: resolution,
     });
 
@@ -134,9 +164,24 @@ export class DisputeService {
   }
 
   /** List disputes (with filters). */
-  async list(filters: { status?: string; tournamentId?: string; page: number; limit: number }) {
-    const where: Record<string, unknown> = {};
-    if (filters.status) where.status = filters.status;
+  async list(filters: {
+    status?: string;
+    tournamentId?: string;
+    page: number;
+    limit: number;
+  }) {
+    const where: Prisma.DisputeWhereInput = {};
+    if (filters.status)
+      where.status = this.authority.assertStatus(filters.status);
+    if (filters.tournamentId) {
+      const matchResults = await this.prisma.matchResult.findMany({
+        where: { match: { tournamentId: filters.tournamentId } },
+        select: { id: true },
+      });
+      where.matchResultId = {
+        in: matchResults.map((result: { id: string }) => result.id),
+      };
+    }
 
     const [items, total] = await Promise.all([
       this.prisma.dispute.findMany({
@@ -151,32 +196,76 @@ export class DisputeService {
   }
 
   /** Get dispute by ID. */
-  async getById(disputeId: string) {
-    const dispute = await this.prisma.dispute.findUnique({ where: { id: disputeId } });
-    if (!dispute) {
-      throw new NotFoundError(ErrorCodes.RESOURCE_NOT_FOUND, 'Dispute not found.');
-    }
-    return dispute;
+  async getById(user: RequestUser, disputeId: string) {
+    return this.authority.getDisputeForUser(disputeId, user);
   }
 
   /** Withdraw dispute (player). */
   async withdraw(user: RequestUser, disputeId: string) {
-    const dispute = await this.prisma.dispute.findUnique({ where: { id: disputeId } });
+    const dispute = await this.prisma.dispute.findUnique({
+      where: { id: disputeId },
+    });
     if (!dispute) {
-      throw new NotFoundError(ErrorCodes.RESOURCE_NOT_FOUND, 'Dispute not found.');
+      throw new NotFoundError(
+        ErrorCodes.RESOURCE_NOT_FOUND,
+        'Dispute not found.',
+      );
     }
 
-    const player = await this.prisma.player.findUnique({ where: { userId: user.id } });
+    const player = await this.prisma.player.findUnique({
+      where: { userId: user.id },
+    });
     if (!player || dispute.filedByPlayerId !== player.id) {
       throw new ForbiddenError(ErrorCodes.FORBIDDEN, 'Not your dispute.');
     }
-    if (!['submitted', 'under_review', 'info_requested'].includes(dispute.status)) {
-      throw new BadRequestError(ErrorCodes.VALIDATION_FAILED, 'Cannot withdraw.');
-    }
+    const nextStatus = this.authority.assertTransition(
+      dispute.status,
+      'withdrawn',
+    );
 
-    return this.prisma.dispute.update({
-      where: { id: disputeId },
-      data: { status: 'withdrawn' },
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const db = tx as unknown as PrismaService;
+      const saved = await db.dispute.update({
+        where: { id: disputeId },
+        data: { status: nextStatus },
+      });
+
+      const openDisputes = await db.dispute.count({
+        where: {
+          matchResultId: dispute.matchResultId,
+          id: { not: disputeId },
+          status: { in: [...OPEN_DISPUTE_STATUSES] },
+        },
+      });
+      if (openDisputes === 0) {
+        await db.matchResult.update({
+          where: { id: dispute.matchResultId },
+          data: { status: 'provisional' },
+        });
+      }
+
+      return saved;
     });
+
+    await this.audit.log({
+      actorId: user.id,
+      actorRole: user.role,
+      action: 'dispute.withdrawn',
+      resourceType: 'dispute',
+      resourceId: disputeId,
+      oldValue: { status: dispute.status },
+      newValue: { status: nextStatus },
+    });
+
+    await this.statusHistory.record({
+      resourceType: 'dispute',
+      resourceId: disputeId,
+      previousStatus: dispute.status,
+      newStatus: nextStatus,
+      actorId: user.id,
+      reason: 'Withdrawn by filer.',
+    });
+
+    return updated;
   }
 }

@@ -3,15 +3,24 @@
  * TOUR-001 to TOUR-004.
  */
 import {
-  Controller, Post, Get, Patch, Body, Param, Query, UsePipes,
+  Controller,
+  Post,
+  Get,
+  Patch,
+  Body,
+  Param,
+  Query,
+  UsePipes,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { TournamentService } from './tournament.service.js';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe.js';
-import { CurrentUser, type RequestUser } from '../../common/decorators/current-user.decorator.js';
-import { Public, Roles } from '../../common/decorators/index.js';
-import { ForbiddenError } from '../../lib/errors.js';
-import { ErrorCodes } from '../../common/constants/error-codes.js';
+import {
+  CurrentUser,
+  type RequestUser,
+} from '../../common/decorators/current-user.decorator.js';
+import { Idempotent, Public, Roles } from '../../common/decorators/index.js';
+import { AccessAuthorityService } from '../../domain/access-authority.service.js';
 import {
   CreateTournamentSchema,
   UpdateTournamentSchema,
@@ -25,19 +34,17 @@ import {
 @ApiTags('Tournaments')
 @Controller('tournaments')
 export class TournamentController {
-  constructor(private readonly tournamentService: TournamentService) {}
-
-  private assertActive(user: RequestUser): void {
-    if (user.status === 'suspended' || user.status === 'banned') {
-      throw new ForbiddenError(ErrorCodes.FORBIDDEN, 'Account restricted.');
-    }
-  }
+  constructor(
+    private readonly tournamentService: TournamentService,
+    private readonly access: AccessAuthorityService,
+  ) {}
 
   @Post()
+  @Idempotent()
   @ApiOperation({ summary: 'Create tournament draft' })
   @UsePipes(new ZodValidationPipe(CreateTournamentSchema))
   async create(@CurrentUser() user: RequestUser, @Body() body: any) {
-    this.assertActive(user);
+    this.access.assertActiveUser(user);
     return this.tournamentService.create(user, body);
   }
 
@@ -83,11 +90,12 @@ export class TournamentController {
     @Param('id') id: string,
     @Body() body: any,
   ) {
-    this.assertActive(user);
+    this.access.assertActiveUser(user);
     return this.tournamentService.update(user, id, body);
   }
 
   @Post(':id/transition')
+  @Idempotent()
   @ApiOperation({ summary: 'Transition tournament status' })
   @UsePipes(new ZodValidationPipe(TransitionTournamentSchema))
   async transition(
@@ -95,11 +103,17 @@ export class TournamentController {
     @Param('id') id: string,
     @Body() body: { action: string; reason?: string },
   ) {
-    this.assertActive(user);
-    return this.tournamentService.transition(user, id, body.action, body.reason);
+    this.access.assertActiveUser(user);
+    return this.tournamentService.transition(
+      user,
+      id,
+      body.action,
+      body.reason,
+    );
   }
 
   @Post(':id/scoring-config')
+  @Idempotent()
   @ApiOperation({ summary: 'Set scoring config (creates new version)' })
   @UsePipes(new ZodValidationPipe(ScoringConfigSchema))
   async setScoringConfig(
@@ -107,11 +121,12 @@ export class TournamentController {
     @Param('id') id: string,
     @Body() body: any,
   ) {
-    this.assertActive(user);
+    this.access.assertActiveUser(user);
     return this.tournamentService.setScoringConfig(user, id, body);
   }
 
   @Post(':id/config/:configVersionId/prizes')
+  @Idempotent()
   @ApiOperation({ summary: 'Set prize rules for config version' })
   @UsePipes(new ZodValidationPipe(PrizeConfigSchema))
   async setPrizeConfig(
@@ -120,11 +135,17 @@ export class TournamentController {
     @Param('configVersionId') configVersionId: string,
     @Body() body: any,
   ) {
-    this.assertActive(user);
-    return this.tournamentService.setPrizeConfig(user, id, configVersionId, body);
+    this.access.assertActiveUser(user);
+    return this.tournamentService.setPrizeConfig(
+      user,
+      id,
+      configVersionId,
+      body,
+    );
   }
 
   @Post(':id/config/:configVersionId/tiebreaks')
+  @Idempotent()
   @ApiOperation({ summary: 'Set tiebreak rules for config version' })
   @UsePipes(new ZodValidationPipe(TiebreakConfigSchema))
   async setTiebreakConfig(
@@ -133,7 +154,12 @@ export class TournamentController {
     @Param('configVersionId') configVersionId: string,
     @Body() body: any,
   ) {
-    this.assertActive(user);
-    return this.tournamentService.setTiebreakConfig(user, id, configVersionId, body);
+    this.access.assertActiveUser(user);
+    return this.tournamentService.setTiebreakConfig(
+      user,
+      id,
+      configVersionId,
+      body,
+    );
   }
 }

@@ -13,6 +13,7 @@ export type RegisterSoloInput = z.infer<typeof RegisterSoloSchema>;
 export const RegisterTeamSchema = z.object({
   tournamentId: z.string().uuid(),
   memberPlayerIds: z.array(z.string().uuid()).min(1),
+  teamName: z.string().min(2).max(50).optional(),
 });
 
 export type RegisterTeamInput = z.infer<typeof RegisterTeamSchema>;

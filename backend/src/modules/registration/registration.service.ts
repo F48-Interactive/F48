@@ -3,17 +3,13 @@
  * REG-001 to REG-011.
  */
 import { Injectable, Logger } from '@nestjs/common';
+import { Prisma } from '../../generated/prisma/client.js';
 import { PrismaService } from '../../config/database.service.js';
-import { AuditService } from '../audit/audit.service.js';
 import { EventBusService } from '../../realtime/event-bus.service.js';
-import {
-  NotFoundError,
-  ConflictError,
-  BadRequestError,
-  ForbiddenError,
-} from '../../lib/errors.js';
+import { NotFoundError, BadRequestError } from '../../lib/errors.js';
 import { ErrorCodes } from '../../common/constants/error-codes.js';
 import type { RequestUser } from '../../common/decorators/current-user.decorator.js';
+import { RegistrationAuthorityService } from '../../domain/registration-authority.service.js';
 
 @Injectable()
 export class RegistrationService {
@@ -21,42 +17,49 @@ export class RegistrationService {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly audit: AuditService,
     private readonly eventBus: EventBusService,
+    private readonly authority: RegistrationAuthorityService,
   ) {}
 
   /** Register solo player for a tournament. */
   async registerSolo(user: RequestUser, tournamentId: string) {
-    const { tournament, player } = await this.validateRegistration(user, tournamentId);
+    const { tournament, player } = await this.authority.getRegistrationContext(
+      user,
+      tournamentId,
+    );
+    this.authority.assertSoloTournament(tournament);
 
-    // Check for existing registration
-    const existing = await this.prisma.registration.findUnique({
-      where: { tournamentId_captainPlayerId: { tournamentId, captainPlayerId: player.id } },
-    });
-    if (existing) {
-      throw new ConflictError(ErrorCodes.DUPLICATE_RESOURCE, 'Already registered.');
-    }
+    const registration = await this.prisma.$transaction(
+      async (tx) => {
+        const db = tx as unknown as PrismaService;
+        await this.authority.assertNoActiveMembership(db, tournamentId, [
+          player.id,
+        ]);
+        const slotNumber = await this.authority.reserveConfirmedSlot(
+          db,
+          tournamentId,
+          tournament.maxUnits,
+        );
 
-    // Check capacity
-    const count = await this.prisma.registration.count({
-      where: { tournamentId, status: { in: ['confirmed', 'checked_in'] } },
-    });
-    if (count >= tournament.maxUnits) {
-      throw new BadRequestError(ErrorCodes.VALIDATION_FAILED, 'Tournament is full.');
-    }
-
-    const registration = await this.prisma.registration.create({
-      data: {
-        tournamentId,
-        captainPlayerId: player.id,
-        status: 'confirmed',
-        slotNumber: count + 1,
-        members: {
-          create: { playerId: player.id, role: 'captain', inviteStatus: 'accepted' },
-        },
+        return db.registration.create({
+          data: {
+            tournamentId,
+            captainPlayerId: player.id,
+            status: 'confirmed',
+            slotNumber,
+            members: {
+              create: {
+                playerId: player.id,
+                role: 'captain',
+                inviteStatus: 'accepted',
+              },
+            },
+          },
+          include: { members: true },
+        });
       },
-      include: { members: true },
-    });
+      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+    );
 
     this.eventBus.emit({
       eventType: 'tournament.registration_count.changed',
@@ -64,7 +67,10 @@ export class RegistrationService {
       entityId: tournamentId,
       version: 1,
       timestamp: new Date().toISOString(),
-      payload: { confirmedCount: count + 1, maxRegistrations: tournament.maxUnits },
+      payload: {
+        confirmedCount: registration.slotNumber,
+        maxRegistrations: tournament.maxUnits,
+      },
     });
 
     this.logger.log({ tournamentId, playerId: player.id }, 'Solo registration');
@@ -78,54 +84,57 @@ export class RegistrationService {
     memberPlayerIds: string[],
     teamName?: string,
   ) {
-    const { tournament, player } = await this.validateRegistration(user, tournamentId);
+    const { tournament, player } = await this.authority.getRegistrationContext(
+      user,
+      tournamentId,
+    );
+    this.authority.assertTeamTournament(tournament);
 
-    if (tournament.mode === 'solo') {
-      throw new BadRequestError(ErrorCodes.VALIDATION_FAILED, 'Use solo registration for solo tournaments.');
-    }
-
-    const maxMembers = tournament.mode === 'duo' ? 2 : 4;
     const allPlayerIds = [player.id, ...memberPlayerIds];
-    if (allPlayerIds.length > maxMembers) {
-      throw new BadRequestError(ErrorCodes.VALIDATION_FAILED, `Max ${maxMembers} players for ${tournament.mode}.`);
-    }
+    this.authority.assertExactRoster(tournament.mode, allPlayerIds);
+    await this.authority.assertPlayersEligible(allPlayerIds);
 
-    const existing = await this.prisma.registration.findUnique({
-      where: { tournamentId_captainPlayerId: { tournamentId, captainPlayerId: player.id } },
-    });
-    if (existing) {
-      throw new ConflictError(ErrorCodes.DUPLICATE_RESOURCE, 'Already registered.');
-    }
+    const registration = await this.prisma.$transaction(
+      async (tx) => {
+        const db = tx as unknown as PrismaService;
+        await this.authority.assertNoActiveMembership(
+          db,
+          tournamentId,
+          allPlayerIds,
+        );
 
-    const count = await this.prisma.registration.count({
-      where: { tournamentId, status: { in: ['confirmed', 'checked_in', 'pending_invite'] } },
-    });
-    if (count >= tournament.maxUnits) {
-      throw new BadRequestError(ErrorCodes.VALIDATION_FAILED, 'Tournament is full.');
-    }
-
-    const registration = await this.prisma.registration.create({
-      data: {
-        tournamentId,
-        captainPlayerId: player.id,
-        status: memberPlayerIds.length > 0 ? 'pending_invite' : 'confirmed',
-        teamName,
-        slotNumber: count + 1,
-        members: {
-          create: [
-            { playerId: player.id, role: 'captain', inviteStatus: 'accepted' },
-            ...memberPlayerIds.map((pid) => ({
-              playerId: pid,
-              role: 'member' as const,
-              inviteStatus: 'pending',
-            })),
-          ],
-        },
+        return db.registration.create({
+          data: {
+            tournamentId,
+            captainPlayerId: player.id,
+            status: 'pending_invite',
+            teamName,
+            slotNumber: null,
+            members: {
+              create: [
+                {
+                  playerId: player.id,
+                  role: 'captain',
+                  inviteStatus: 'accepted',
+                },
+                ...memberPlayerIds.map((pid) => ({
+                  playerId: pid,
+                  role: 'member' as const,
+                  inviteStatus: 'pending',
+                })),
+              ],
+            },
+          },
+          include: { members: true },
+        });
       },
-      include: { members: true },
-    });
+      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+    );
 
-    this.logger.log({ tournamentId, teamSize: allPlayerIds.length }, 'Team registration');
+    this.logger.log(
+      { tournamentId, teamSize: allPlayerIds.length },
+      'Team registration',
+    );
     return registration;
   }
 
@@ -133,18 +142,29 @@ export class RegistrationService {
   async checkIn(user: RequestUser, registrationId: string) {
     const registration = await this.prisma.registration.findUnique({
       where: { id: registrationId },
-      include: { tournament: true },
+      include: { tournament: true, members: true },
     });
 
     if (!registration) {
-      throw new NotFoundError(ErrorCodes.RESOURCE_NOT_FOUND, 'Registration not found.');
+      throw new NotFoundError(
+        ErrorCodes.RESOURCE_NOT_FOUND,
+        'Registration not found.',
+      );
     }
     if (registration.tournament.status !== 'check_in') {
-      throw new BadRequestError(ErrorCodes.VALIDATION_FAILED, 'Check-in is not open.');
+      throw new BadRequestError(
+        ErrorCodes.VALIDATION_FAILED,
+        'Check-in is not open.',
+      );
     }
     if (registration.status !== 'confirmed') {
-      throw new BadRequestError(ErrorCodes.VALIDATION_FAILED, `Cannot check in from ${registration.status}.`);
+      throw new BadRequestError(
+        ErrorCodes.VALIDATION_FAILED,
+        `Cannot check in from ${registration.status}.`,
+      );
     }
+
+    await this.authority.assertCanCheckIn(user, registration);
 
     return this.prisma.registration.update({
       where: { id: registrationId },
@@ -159,53 +179,107 @@ export class RegistrationService {
       include: { members: true },
     });
     if (!registration) {
-      throw new NotFoundError(ErrorCodes.RESOURCE_NOT_FOUND, 'Registration not found.');
+      throw new NotFoundError(
+        ErrorCodes.RESOURCE_NOT_FOUND,
+        'Registration not found.',
+      );
     }
-    if (!['confirmed', 'checked_in', 'pending_invite'].includes(registration.status)) {
-      throw new BadRequestError(ErrorCodes.VALIDATION_FAILED, 'Cannot withdraw.');
+    if (
+      !['confirmed', 'checked_in', 'pending_invite'].includes(
+        registration.status,
+      )
+    ) {
+      throw new BadRequestError(
+        ErrorCodes.VALIDATION_FAILED,
+        'Cannot withdraw.',
+      );
     }
 
-    // Only captain or admin can withdraw
-    const isCaptainMember = registration.members.some(
-      (m: { playerId: string }) => m.playerId === user.id || registration.captainPlayerId === user.id,
-    );
-    if (!isCaptainMember && user.role !== 'admin' && user.role !== 'super_admin') {
-      throw new ForbiddenError(ErrorCodes.FORBIDDEN, 'Not authorized.');
-    }
+    await this.authority.assertCanWithdraw(user, registration);
 
     return this.prisma.registration.update({
       where: { id: registrationId },
-      data: { status: 'withdrawn', withdrawnAt: new Date(), withdrawReason: reason },
+      data: {
+        status: 'withdrawn',
+        withdrawnAt: new Date(),
+        withdrawReason: reason,
+      },
     });
   }
 
   /** Respond to team invite. */
-  async respondToInvite(playerId: string, registrationId: string, response: 'accepted' | 'declined') {
+  async respondToInvite(
+    user: RequestUser,
+    registrationId: string,
+    response: 'accepted' | 'declined',
+  ) {
+    const playerId = await this.authority.getEligiblePlayerIdForUser(user);
+
     const member = await this.prisma.registrationMember.findFirst({
       where: { registrationId, playerId, inviteStatus: 'pending' },
     });
     if (!member) {
-      throw new NotFoundError(ErrorCodes.RESOURCE_NOT_FOUND, 'Invitation not found.');
+      throw new NotFoundError(
+        ErrorCodes.RESOURCE_NOT_FOUND,
+        'Invitation not found.',
+      );
     }
 
-    await this.prisma.registrationMember.update({
-      where: { id: member.id },
-      data: { inviteStatus: response },
-    });
+    await this.prisma.$transaction(
+      async (tx) => {
+        const db = tx as unknown as PrismaService;
 
-    // If all invites accepted, confirm registration
-    if (response === 'accepted') {
-      const allMembers = await this.prisma.registrationMember.findMany({
-        where: { registrationId },
-      });
-      const allAccepted = allMembers.every((m: { inviteStatus: string }) => m.inviteStatus === 'accepted');
-      if (allAccepted) {
-        await this.prisma.registration.update({
-          where: { id: registrationId },
-          data: { status: 'confirmed' },
+        await db.registrationMember.update({
+          where: { id: member.id },
+          data: { inviteStatus: response },
         });
-      }
-    }
+
+        if (response === 'declined') {
+          await db.registration.update({
+            where: { id: registrationId },
+            data: {
+              status: 'withdrawn',
+              withdrawnAt: new Date(),
+              withdrawReason: 'Team invite declined.',
+            },
+          });
+          return;
+        }
+
+        const registration = await db.registration.findUnique({
+          where: { id: registrationId },
+          include: { members: true, tournament: true },
+        });
+        if (!registration) {
+          throw new NotFoundError(
+            ErrorCodes.RESOURCE_NOT_FOUND,
+            'Registration not found.',
+          );
+        }
+
+        const allAccepted = registration.members.every(
+          (m: { inviteStatus: string }) => m.inviteStatus === 'accepted',
+        );
+        if (allAccepted) {
+          const count = await db.registration.count({
+            where: {
+              tournamentId: registration.tournamentId,
+              status: { in: ['confirmed', 'checked_in'] },
+            },
+          });
+          const slotNumber = this.authority.assertCanConfirmInviteCapacity(
+            count,
+            registration.tournament.maxUnits,
+          );
+
+          await db.registration.update({
+            where: { id: registrationId },
+            data: { status: 'confirmed', slotNumber },
+          });
+        }
+      },
+      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+    );
 
     return { status: response };
   }
@@ -214,36 +288,16 @@ export class RegistrationService {
   async listByTournament(tournamentId: string, page: number, limit: number) {
     const [items, total] = await Promise.all([
       this.prisma.registration.findMany({
-        where: { tournamentId },
+        where: { tournamentId, status: { in: ['confirmed', 'checked_in'] } },
         include: { members: true },
         orderBy: { slotNumber: 'asc' },
         skip: (page - 1) * limit,
         take: limit,
       }),
-      this.prisma.registration.count({ where: { tournamentId } }),
+      this.prisma.registration.count({
+        where: { tournamentId, status: { in: ['confirmed', 'checked_in'] } },
+      }),
     ]);
     return { items, total, page, limit };
-  }
-
-  private async validateRegistration(user: RequestUser, tournamentId: string) {
-    const tournament = await this.prisma.tournament.findFirst({
-      where: { id: tournamentId, isDeleted: false },
-    });
-    if (!tournament) {
-      throw new NotFoundError(ErrorCodes.RESOURCE_NOT_FOUND, 'Tournament not found.');
-    }
-    if (tournament.status !== 'registration_open') {
-      throw new BadRequestError(ErrorCodes.VALIDATION_FAILED, 'Registration is not open.');
-    }
-
-    const player = await this.prisma.player.findUnique({ where: { userId: user.id } });
-    if (!player) {
-      throw new BadRequestError(ErrorCodes.VALIDATION_FAILED, 'Player profile required.');
-    }
-    if (player.status !== 'active') {
-      throw new ForbiddenError(ErrorCodes.FORBIDDEN, 'Player account is not active.');
-    }
-
-    return { tournament, player };
   }
 }

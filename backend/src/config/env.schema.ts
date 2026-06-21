@@ -14,20 +14,40 @@ export const envSchema = z.object({
   API_PREFIX: z.string().default('api/v1'),
 
   // ── Database (PostgreSQL via Prisma) ──
-  DATABASE_URL: z.string().url({ message: 'DATABASE_URL must be a valid PostgreSQL connection string' }),
+  DATABASE_URL: z
+    .string()
+    .url({
+      message: 'DATABASE_URL must be a valid PostgreSQL connection string',
+    }),
 
   // ── Redis ──
-  REDIS_URL: z.string().url({ message: 'REDIS_URL must be a valid Redis connection string' }),
+  REDIS_URL: z
+    .string()
+    .url({ message: 'REDIS_URL must be a valid Redis connection string' }),
 
   // ── Firebase Admin SDK ──
   FIREBASE_PROJECT_ID: z.string().min(1),
   FIREBASE_CLIENT_EMAIL: z.string().email(),
-  FIREBASE_PRIVATE_KEY: z.string().min(1, { message: 'FIREBASE_PRIVATE_KEY is required' }),
+  FIREBASE_PRIVATE_KEY: z
+    .string()
+    .min(1, { message: 'FIREBASE_PRIVATE_KEY is required' }),
 
   // ── Session / Cookies ──
-  SESSION_SECRET: z.string().min(32, { message: 'SESSION_SECRET must be at least 32 characters' }),
-  SESSION_MAX_AGE_MS: z.coerce.number().int().positive().default(7 * 24 * 60 * 60 * 1000), // 7 days
+  SESSION_SECRET: z
+    .string()
+    .min(32, { message: 'SESSION_SECRET must be at least 32 characters' }),
+  SESSION_MAX_AGE_MS: z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(7 * 24 * 60 * 60 * 1000), // 7 days
   COOKIE_DOMAIN: z.string().optional(),
+  ROOM_CREDENTIALS_SECRET: z
+    .string()
+    .min(32, {
+      message: 'ROOM_CREDENTIALS_SECRET must be at least 32 characters',
+    })
+    .optional(),
 
   // ── Cloudinary ──
   CLOUDINARY_CLOUD_NAME: z.string().min(1),
@@ -52,7 +72,9 @@ export const envSchema = z.object({
   THROTTLE_LIMIT: z.coerce.number().int().positive().default(100),
 
   // ── Logging ──
-  LOG_LEVEL: z.enum(['trace', 'debug', 'info', 'warn', 'error', 'fatal']).default('info'),
+  LOG_LEVEL: z
+    .enum(['trace', 'debug', 'info', 'warn', 'error', 'fatal'])
+    .default('info'),
 });
 
 export type EnvConfig = z.infer<typeof envSchema>;

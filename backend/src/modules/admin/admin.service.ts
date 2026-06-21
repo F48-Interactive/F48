@@ -6,12 +6,21 @@ import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../config/database.service.js';
 import { AuditService } from '../audit/audit.service.js';
 import { StatusHistoryService } from '../audit/status-history.service.js';
-import {
-  NotFoundError,
-  BadRequestError,
-} from '../../lib/errors.js';
+import { NotFoundError, BadRequestError } from '../../lib/errors.js';
 import { ErrorCodes } from '../../common/constants/error-codes.js';
 import type { RequestUser } from '../../common/decorators/current-user.decorator.js';
+
+const ACTIVE_TOURNAMENT_STATUSES = [
+  'published',
+  'registration_open',
+  'registration_closed',
+  'check_in',
+  'live',
+  'results_pending',
+  'dispute_window',
+  'results_final',
+  'settlement',
+] as const;
 
 @Injectable()
 export class AdminService {
@@ -31,10 +40,16 @@ export class AdminService {
     reason: string,
   ) {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
-    if (!user) throw new NotFoundError(ErrorCodes.RESOURCE_NOT_FOUND, 'User not found.');
+    if (!user)
+      throw new NotFoundError(ErrorCodes.RESOURCE_NOT_FOUND, 'User not found.');
 
     const previousStatus = user.status;
-    const newStatus = action === 'reinstate' ? 'active' : action === 'suspend' ? 'suspended' : 'banned';
+    const newStatus =
+      action === 'reinstate'
+        ? 'active'
+        : action === 'suspend'
+          ? 'suspended'
+          : 'banned';
 
     await this.prisma.user.update({
       where: { id: userId },
@@ -44,7 +59,14 @@ export class AdminService {
     // Also update player/organizer status if exists
     await this.prisma.player.updateMany({
       where: { userId },
-      data: { status: action === 'reinstate' ? 'active' : action === 'suspend' ? 'suspended' : 'banned' },
+      data: {
+        status:
+          action === 'reinstate'
+            ? 'active'
+            : action === 'suspend'
+              ? 'suspended'
+              : 'banned',
+      },
     });
 
     await this.prisma.adminAction.create({
@@ -87,14 +109,17 @@ export class AdminService {
       where: { playerId, status: 'active' },
     });
     if (!binding) {
-      throw new NotFoundError(ErrorCodes.RESOURCE_NOT_FOUND, 'No active FF binding.');
+      throw new NotFoundError(
+        ErrorCodes.RESOURCE_NOT_FOUND,
+        'No active FF binding.',
+      );
     }
 
     // Check no active tournament participation
     const activeReg = await this.prisma.registration.findFirst({
       where: {
         members: { some: { playerId } },
-        tournament: { status: { in: ['registration_open', 'check_in', 'live'] } },
+        tournament: { status: { in: [...ACTIVE_TOURNAMENT_STATUSES] } },
         status: { in: ['confirmed', 'checked_in'] },
       },
     });
@@ -107,7 +132,7 @@ export class AdminService {
 
     await this.prisma.playerFfBinding.update({
       where: { id: binding.id },
-      data: { status: 'removed' },
+      data: { status: 'removed', unboundAt: new Date(), unboundReason: reason },
     });
 
     await this.prisma.adminAction.create({
@@ -132,7 +157,10 @@ export class AdminService {
       reason,
     });
 
-    this.logger.log({ playerId, ffUid: binding.ffUid }, 'FF binding removed by admin');
+    this.logger.log(
+      { playerId, ffUid: binding.ffUid },
+      'FF binding removed by admin',
+    );
     return { playerId, unboundFfUid: binding.ffUid };
   }
 
@@ -152,8 +180,11 @@ export class AdminService {
   /** Dashboard stats (ADMIN-001). */
   async getDashboardStats() {
     const [
-      totalUsers, totalPlayers, totalOrganizers,
-      totalTournaments, activeTournaments,
+      totalUsers,
+      totalPlayers,
+      totalOrganizers,
+      totalTournaments,
+      activeTournaments,
       openDisputes,
       pendingFunding,
     ] = await Promise.all([
@@ -162,16 +193,25 @@ export class AdminService {
       this.prisma.organizer.count(),
       this.prisma.tournament.count({ where: { isDeleted: false } }),
       this.prisma.tournament.count({
-        where: { status: { in: ['registration_open', 'check_in', 'live'] }, isDeleted: false },
+        where: {
+          status: { in: [...ACTIVE_TOURNAMENT_STATUSES] },
+          isDeleted: false,
+        },
       }),
-      this.prisma.dispute.count({ where: { status: { in: ['submitted', 'under_review'] } } }),
+      this.prisma.dispute.count({
+        where: { status: { in: ['submitted', 'under_review'] } },
+      }),
       this.prisma.fundingRequest.count({ where: { status: 'submitted' } }),
     ]);
 
     return {
-      totalUsers, totalPlayers, totalOrganizers,
-      totalTournaments, activeTournaments,
-      openDisputes, pendingFunding,
+      totalUsers,
+      totalPlayers,
+      totalOrganizers,
+      totalTournaments,
+      activeTournaments,
+      openDisputes,
+      pendingFunding,
     };
   }
 }

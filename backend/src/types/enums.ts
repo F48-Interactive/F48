@@ -66,6 +66,7 @@ export const TournamentStatus = {
   COMPLETED: 'completed',
   CANCELED: 'canceled',
   VOIDED: 'voided',
+  ARCHIVED: 'archived',
 } as const;
 export type TournamentStatus =
   (typeof TournamentStatus)[keyof typeof TournamentStatus];
@@ -102,8 +103,7 @@ export const StructureType = {
   DIRECT_FINAL: 'direct_final',
   QUALIFIERS_TO_FINAL: 'qualifiers_to_final',
 } as const;
-export type StructureType =
-  (typeof StructureType)[keyof typeof StructureType];
+export type StructureType = (typeof StructureType)[keyof typeof StructureType];
 
 export const ScoringModel = {
   COMBINED: 'combined',
@@ -115,17 +115,17 @@ export type ScoringModel = (typeof ScoringModel)[keyof typeof ScoringModel];
 // ── Registration ──
 
 export const RegistrationStatus = {
-  DRAFT_ROSTER: 'draft_roster',
-  PENDING_MEMBERS: 'pending_members',
-  PENDING_PAYMENT: 'pending_payment',
-  PENDING_APPROVAL: 'pending_approval',
+  PENDING_INVITE: 'pending_invite',
   CONFIRMED: 'confirmed',
   WAITLISTED: 'waitlisted',
   CHECKED_IN: 'checked_in',
-  REJECTED: 'rejected',
-  CANCELED: 'canceled',
-  REMOVED: 'removed',
+  NO_SHOW: 'no_show',
+  WITHDRAWN: 'withdrawn',
   DISQUALIFIED: 'disqualified',
+  ADVANCED: 'advanced',
+  ELIMINATED: 'eliminated',
+  CANCELED: 'canceled',
+  REFUNDED: 'refunded',
 } as const;
 export type RegistrationStatus =
   (typeof RegistrationStatus)[keyof typeof RegistrationStatus];
@@ -175,27 +175,26 @@ export type ResultStatus = (typeof ResultStatus)[keyof typeof ResultStatus];
 // ── Disputes ──
 
 export const DisputeStatus = {
-  DRAFT: 'draft',
   SUBMITTED: 'submitted',
-  ORGANIZER_RESPONSE: 'organizer_response',
-  F48_REVIEW: 'f48_review',
+  UNDER_REVIEW: 'under_review',
+  INFO_REQUESTED: 'info_requested',
+  INVESTIGATING: 'investigating',
   RESOLVED_ACCEPTED: 'resolved_accepted',
   RESOLVED_REJECTED: 'resolved_rejected',
-  RESOLVED_PARTIALLY: 'resolved_partially',
-  CLOSED: 'closed',
+  RESOLVED_PARTIAL: 'resolved_partial',
+  WITHDRAWN: 'withdrawn',
 } as const;
-export type DisputeStatus =
-  (typeof DisputeStatus)[keyof typeof DisputeStatus];
+export type DisputeStatus = (typeof DisputeStatus)[keyof typeof DisputeStatus];
 
 export const DisputeCategory = {
-  NO_SHOW: 'no_show',
+  INCORRECT_SCORE: 'incorrect_score',
+  WRONG_PLACEMENT: 'wrong_placement',
+  KILL_COUNT_MISMATCH: 'kill_count_mismatch',
   WRONG_PLAYER: 'wrong_player',
-  COLLUSION: 'collusion',
+  TECHNICAL_ISSUE: 'technical_issue',
   RULE_VIOLATION: 'rule_violation',
-  FALSE_EVIDENCE: 'false_evidence',
-  TECHNICAL_FAILURE: 'technical_failure',
-  ORGANIZER_FAILURE: 'organizer_failure',
-  ABUSIVE_CONDUCT: 'abusive_conduct',
+  UNFAIR_PLAY: 'unfair_play',
+  OTHER: 'other',
 } as const;
 export type DisputeCategory =
   (typeof DisputeCategory)[keyof typeof DisputeCategory];
@@ -241,8 +240,7 @@ export const TiebreakField = {
   FEWER_PENALTIES: 'fewer_penalties',
   DECIDING_MATCH: 'deciding_match',
 } as const;
-export type TiebreakField =
-  (typeof TiebreakField)[keyof typeof TiebreakField];
+export type TiebreakField = (typeof TiebreakField)[keyof typeof TiebreakField];
 
 // ── Media ──
 
@@ -259,7 +257,7 @@ export const MediaPurpose = {
 export type MediaPurpose = (typeof MediaPurpose)[keyof typeof MediaPurpose];
 
 export const MediaAccessLevel = {
-  PUBLIC: 'public',
+  PUBLIC: 'public_access',
   AUTHENTICATED: 'authenticated',
   RESTRICTED: 'restricted',
 } as const;

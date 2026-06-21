@@ -1,13 +1,31 @@
 /**
  * FundingController — Funding request endpoints.
  */
-import { Controller, Post, Get, Body, Param, Query, UsePipes } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Get,
+  Body,
+  Param,
+  Query,
+  UsePipes,
+} from '@nestjs/common';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { FundingService } from './funding.service.js';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe.js';
-import { CurrentUser, type RequestUser } from '../../common/decorators/current-user.decorator.js';
-import { Roles } from '../../common/decorators/index.js';
-import { CreateFundingRequestSchema, ReviewFundingRequestSchema } from './dto/funding.dto.js';
+import {
+  CurrentUser,
+  type RequestUser,
+} from '../../common/decorators/current-user.decorator.js';
+import {
+  ElevatedAction,
+  Idempotent,
+  Roles,
+} from '../../common/decorators/index.js';
+import {
+  CreateFundingRequestSchema,
+  ReviewFundingRequestSchema,
+} from './dto/funding.dto.js';
 
 @ApiTags('Funding')
 @Controller('funding')
@@ -15,16 +33,22 @@ export class FundingController {
   constructor(private readonly fundingService: FundingService) {}
 
   @Post('request')
+  @Idempotent()
   @ApiOperation({ summary: 'Create funding request' })
   @UsePipes(new ZodValidationPipe(CreateFundingRequestSchema))
   async createRequest(
     @CurrentUser() user: RequestUser,
     @Body() body: { tournamentId: string; requestedPaise: number },
   ) {
-    return this.fundingService.createRequest(user, body.tournamentId, BigInt(body.requestedPaise));
+    return this.fundingService.createRequest(
+      user,
+      body.tournamentId,
+      BigInt(body.requestedPaise),
+    );
   }
 
   @Post(':id/submit')
+  @Idempotent()
   @ApiOperation({ summary: 'Submit funding request for review' })
   async submitRequest(
     @CurrentUser() user: RequestUser,
@@ -34,6 +58,8 @@ export class FundingController {
   }
 
   @Post(':id/review')
+  @Idempotent()
+  @ElevatedAction()
   @Roles('admin', 'super_admin')
   @ApiOperation({ summary: 'Admin: review funding request' })
   @UsePipes(new ZodValidationPipe(ReviewFundingRequestSchema))
@@ -43,7 +69,9 @@ export class FundingController {
     @Body() body: { decision: any; approvedPaise?: number; notes?: string },
   ) {
     return this.fundingService.adminReview(
-      admin, id, body.decision,
+      admin,
+      id,
+      body.decision,
       body.approvedPaise ? BigInt(body.approvedPaise) : undefined,
       body.notes,
     );
