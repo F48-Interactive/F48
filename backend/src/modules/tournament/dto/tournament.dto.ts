@@ -15,15 +15,11 @@ const FundingTypeSchema = z.enum([
 ]);
 
 const StageConfigSchema = z.object({
-  qualifierRooms: z.number().int().min(0).max(4).default(0),
-  qualifierMatchesPerRoom: z.number().int().min(0).max(12).default(0),
-  advancingPerQualifier: z.number().int().min(0).max(48).default(0),
-  finalMatches: z.number().int().min(1).max(12),
-  pointsResetBeforeFinal: z.boolean().default(true),
+  roomCount: z.number().int().min(1).max(4),
+  matchesPerRoom: z.number().int().min(1).max(12),
   matchSchedule: z
     .array(
       z.object({
-        stage: z.enum(['qualifier', 'final']),
         roomOrder: z.number().int().min(1).max(4),
         matchOrder: z.number().int().min(1).max(12),
         scheduledAt: z.string().datetime().optional(),
@@ -39,7 +35,7 @@ export const CreateTournamentSchema = z.object({
   description: z.string().max(2000).optional(),
   mode: z.enum(['solo', 'duo', 'squad']),
   fundingType: FundingTypeSchema,
-  structureType: z.enum(['direct_final', 'qualifiers_to_final']),
+  structureType: z.literal('direct_final').default('direct_final'),
   scoringModel: z.enum(['combined', 'placement_only', 'kills_only']),
   maxUnits: z.number().int().min(2).max(192),
   entryFeePaise: z.number().int().min(0).optional(),
@@ -64,7 +60,7 @@ export const UpdateTournamentSchema = z.object({
   description: z.string().max(2000).optional(),
   mode: z.enum(['solo', 'duo', 'squad']).optional(),
   fundingType: FundingTypeSchema.optional(),
-  structureType: z.enum(['direct_final', 'qualifiers_to_final']).optional(),
+  structureType: z.literal('direct_final').optional(),
   maxUnits: z.number().int().min(2).max(192).optional(),
   entryFeePaise: z.number().int().min(0).optional(),
   prizePoolPaise: z.number().int().min(0).optional(),

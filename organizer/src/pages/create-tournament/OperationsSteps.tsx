@@ -53,7 +53,7 @@ export function ScheduleStep({ form, setForm }: Props) {
           <span>Map</span>
         </div>
         {form.matchSchedule.map((row, index) => (
-          <div className="schedule-row" key={`${row.stage}-${row.roomOrder}-${row.matchOrder}`}>
+          <div className="schedule-row" key={`${row.roomOrder}-${row.matchOrder}`}>
             <strong>{label(row)}</strong>
             <input className="input" type="datetime-local" value={row.scheduledAt} onChange={(e) => updateRow(index, { scheduledAt: e.target.value })} />
             <select className="input select" value={row.map} onChange={(e) => updateRow(index, { map: e.target.value })}>
@@ -67,8 +67,7 @@ export function ScheduleStep({ form, setForm }: Props) {
 }
 
 function label(row: MatchScheduleRow): string {
-  if (row.stage === 'final') return `Final M${row.matchOrder}`;
-  return `Qualifier R${row.roomOrder} M${row.matchOrder}`;
+  return `Room ${row.roomOrder} Match ${row.matchOrder}`;
 }
 
 function Field({ label, value, onChange, placeholder = '' }: { label: string; value: string; onChange: (value: string) => void; placeholder?: string }) {

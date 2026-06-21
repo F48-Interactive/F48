@@ -37,7 +37,7 @@ export const MAPS = ['Bermuda', 'Purgatory', 'Kalahari', 'Alpine', 'NexTerra'];
 export const TIEBREAKER_OPTIONS = [
   { value: 'total_booyahs', label: 'More Booyahs' },
   { value: 'total_kills', label: 'More total kills' },
-  { value: 'final_match_placement', label: 'Better final-match placement' },
+  { value: 'final_match_placement', label: 'Better last-match placement' },
   { value: 'average_placement', label: 'Better average placement' },
   { value: 'higher_placement_count', label: 'More higher-placement finishes' },
   { value: 'fewer_penalties', label: 'Fewer penalty points' },

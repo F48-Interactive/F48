@@ -1,12 +1,10 @@
 export type TournamentMode = 'solo' | 'duo' | 'squad';
 export type FundingType = 'free' | 'organizer_funded' | 'f48_sponsored' | 'entry_fee';
-export type StructureType = 'direct_final' | 'qualifiers_to_final';
 export type ScoringModel = 'combined' | 'placement_only' | 'kills_only';
 export type Visibility = 'public' | 'invite_only';
 export type RegistrationApproval = 'automatic' | 'organizer_approval';
 
 export interface MatchScheduleRow {
-  stage: 'qualifier' | 'final';
   roomOrder: number;
   matchOrder: number;
   scheduledAt: string;
@@ -41,11 +39,7 @@ export interface TournamentForm {
   prizePoolRupees: string;
   mode: TournamentMode;
   maxUnits: number;
-  structureType: StructureType;
-  qualifierMatchesPerRoom: number;
-  advancingPerQualifier: number;
-  finalMatches: number;
-  pointsResetBeforeFinal: boolean;
+  numberOfMatches: number;
   registrationOpenAt: string;
   registrationCloseAt: string;
   rosterLockAt: string;

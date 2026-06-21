@@ -32,11 +32,7 @@ export function defaultForm(): TournamentForm {
     prizePoolRupees: '',
     mode: 'squad',
     maxUnits: 12,
-    structureType: 'direct_final',
-    qualifierMatchesPerRoom: 3,
-    advancingPerQualifier: 3,
-    finalMatches: 6,
-    pointsResetBeforeFinal: true,
+    numberOfMatches: 6,
     registrationOpenAt: '',
     registrationCloseAt: '',
     rosterLockAt: '',
@@ -50,7 +46,7 @@ export function defaultForm(): TournamentForm {
     checkInDurationMin: 20,
     roomReleaseMode: 'manual',
     joiningDeadlineMin: 10,
-    matchSchedule: generateSchedule('squad', 'direct_final', 12, 3, 6),
+    matchSchedule: generateSchedule('squad', 12, 6),
     scoringModel: 'combined',
     pointsPerKill: '1.00',
     maxKillPoints: '',
@@ -88,55 +84,40 @@ export function updateMode(form: TournamentForm, mode: TournamentMode): Tourname
     ...form,
     mode,
     maxUnits,
-    structureType: 'direct_final',
     substitutesAllowed: mode === 'solo' ? 0 : mode === 'duo' ? 1 : 2,
     placementPoints: defaultPlacement(mode),
-    matchSchedule: generateSchedule(mode, 'direct_final', maxUnits, 3, form.finalMatches),
+    matchSchedule: generateSchedule(mode, maxUnits, form.numberOfMatches),
   };
 }
 
 export function refreshSchedule(form: TournamentForm): TournamentForm {
   return {
     ...form,
-    matchSchedule: generateSchedule(
-      form.mode,
-      form.structureType,
-      form.maxUnits,
-      form.qualifierMatchesPerRoom,
-      form.finalMatches,
-    ),
+    matchSchedule: generateSchedule(form.mode, form.maxUnits, form.numberOfMatches),
   };
 }
 
 export function generateSchedule(
   mode: TournamentMode,
-  structureType: TournamentForm['structureType'],
   maxUnits: number,
-  qualifierMatches: number,
-  finalMatches: number,
+  numberOfMatches: number,
 ): MatchScheduleRow[] {
   const rows: MatchScheduleRow[] = [];
-  if (structureType === 'qualifiers_to_final') {
-    const rooms = Math.ceil(maxUnits / MODE_CAPACITY[mode]);
-    for (let roomOrder = 1; roomOrder <= rooms; roomOrder += 1) {
-      for (let matchOrder = 1; matchOrder <= qualifierMatches; matchOrder += 1) {
-        rows.push(row('qualifier', roomOrder, matchOrder, rows.length));
-      }
+  const rooms = Math.ceil(maxUnits / MODE_CAPACITY[mode]);
+  for (let roomOrder = 1; roomOrder <= rooms; roomOrder += 1) {
+    for (let matchOrder = 1; matchOrder <= numberOfMatches; matchOrder += 1) {
+      rows.push(row(roomOrder, matchOrder, rows.length));
     }
-  }
-  for (let matchOrder = 1; matchOrder <= finalMatches; matchOrder += 1) {
-    rows.push(row('final', 1, matchOrder, rows.length));
   }
   return rows;
 }
 
 function row(
-  stage: MatchScheduleRow['stage'],
   roomOrder: number,
   matchOrder: number,
   index: number,
 ): MatchScheduleRow {
-  return { stage, roomOrder, matchOrder, scheduledAt: '', map: MAPS[index % MAPS.length] ?? MAPS[0] };
+  return { roomOrder, matchOrder, scheduledAt: '', map: MAPS[index % MAPS.length] ?? MAPS[0] };
 }
 
 export function prizeTotal(form: TournamentForm): number {
@@ -192,8 +173,7 @@ export function metadata(form: TournamentForm): string {
     schedule: {
       roomReleaseMode: form.roomReleaseMode,
       joiningDeadlineMin: form.joiningDeadlineMin,
-      maps: form.matchSchedule.map(({ stage, roomOrder, matchOrder, map }) => ({
-        stage,
+      maps: form.matchSchedule.map(({ roomOrder, matchOrder, map }) => ({
         roomOrder,
         matchOrder,
         map,

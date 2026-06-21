@@ -225,7 +225,7 @@ function tournamentPayload(form: TournamentForm) {
     description: [form.shortDescription, form.fullDescription].filter(Boolean).join('\n\n'),
     mode: form.mode,
     fundingType: form.fundingType,
-    structureType: form.structureType,
+    structureType: 'direct_final',
     scoringModel: form.scoringModel,
     maxUnits: form.maxUnits,
     prizePoolPaise: form.fundingType === 'free' ? undefined : rupeesToPaise(form.prizePoolRupees),
@@ -236,13 +236,9 @@ function tournamentPayload(form: TournamentForm) {
     disputeWindowHours: form.disputeWindowHours,
     rulesText: metadata(form),
     stageConfig: {
-      qualifierRooms: form.structureType === 'qualifiers_to_final' ? roomCount(form) : 0,
-      qualifierMatchesPerRoom: form.structureType === 'qualifiers_to_final' ? form.qualifierMatchesPerRoom : 0,
-      advancingPerQualifier: form.structureType === 'qualifiers_to_final' ? form.advancingPerQualifier : 0,
-      finalMatches: form.finalMatches,
-      pointsResetBeforeFinal: form.pointsResetBeforeFinal,
+      roomCount: roomCount(form),
+      matchesPerRoom: form.numberOfMatches,
       matchSchedule: form.matchSchedule.map((row) => ({
-        stage: row.stage,
         roomOrder: row.roomOrder,
         matchOrder: row.matchOrder,
         scheduledAt: toIso(row.scheduledAt),
@@ -267,8 +263,8 @@ function validate(form: TournamentForm, publish: boolean): string[] {
   if (form.title.trim().length < 3) errors.push('Tournament name is required.');
   if (form.fundingType === 'entry_fee') errors.push('Entry-fee tournaments are coming later.');
   if (form.fundingType !== 'free' && rupeesToPaise(form.prizePoolRupees) <= 0) errors.push('Prize pool is required.');
-  if (form.structureType === 'direct_final' && roomCount(form) > 1) errors.push('Direct finals cannot exceed one room.');
-  if (form.structureType === 'qualifiers_to_final' && roomCount(form) <= 1) errors.push('Qualifiers require more than one room.');
+  if (roomCount(form) > 4) errors.push('Tournament capacity cannot exceed four rooms.');
+  if (form.numberOfMatches < 1 || form.numberOfMatches > 12) errors.push('Number of matches must be between 1 and 12.');
   if (form.scoringModel !== 'placement_only' && Number(form.pointsPerKill) <= 0) errors.push('Kill points must be greater than zero.');
   if (form.placementPoints[form.placementPoints.length - 1] !== '0') errors.push('Last placement position must be zero.');
   if (new Set(form.tiebreakers).size !== form.tiebreakers.length) errors.push('Tie-breakers cannot repeat.');
@@ -292,8 +288,8 @@ function validateStep(form: TournamentForm, step: number): string[] {
   }
   if (step === 1 && form.title.trim().length < 3) return ['Tournament name is required.'];
   if (step === 3) {
-    if (form.structureType === 'direct_final' && roomCount(form) > 1) return ['Direct finals cannot exceed one room.'];
-    if (form.structureType === 'qualifiers_to_final' && roomCount(form) <= 1) return ['Qualifiers require more than one room.'];
+    if (roomCount(form) > 4) return ['Tournament capacity cannot exceed four rooms.'];
+    if (form.numberOfMatches < 1 || form.numberOfMatches > 12) return ['Number of matches must be between 1 and 12.'];
   }
   if (step === 6 && form.scoringModel !== 'placement_only' && Number(form.pointsPerKill) <= 0) {
     return ['Kill points must be greater than zero.'];

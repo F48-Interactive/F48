@@ -240,77 +240,40 @@ export class TournamentService {
     const roomCapacity = this.authority.modeCapacity(data.mode);
     let matchNumber = 1;
 
-    if (data.structureType === 'qualifiers_to_final') {
-      const qualifierStage = await db.tournamentStage.create({
-        data: {
-          tournamentId,
-          type: 'qualifier',
-          name: 'Qualifiers',
-          stageOrder: 1,
-          advancementCount: config.advancingPerQualifier,
-          pointsCarryForward: !config.pointsResetBeforeFinal,
-          checkInDurationMin: data.checkInDurationMin,
-        },
-      });
-
-      for (let roomOrder = 1; roomOrder <= config.qualifierRooms; roomOrder += 1) {
-        const remaining = data.maxUnits - (roomOrder - 1) * roomCapacity;
-        const room = await db.tournamentRoom.create({
-          data: {
-            tournamentId,
-            stageId: qualifierStage.id,
-            name: `Qualifier ${roomOrder}`,
-            maxUnits: Math.min(roomCapacity, remaining),
-            roomOrder,
-          },
-        });
-        matchNumber = await this.createMatches(
-          db,
-          tournamentId,
-          qualifierStage.id,
-          room.id,
-          matchNumber,
-          config.qualifierMatchesPerRoom,
-          'qualifier',
-          roomOrder,
-          data,
-        );
-      }
-    }
-
-    const finalStage = await db.tournamentStage.create({
+    const stage = await db.tournamentStage.create({
       data: {
         tournamentId,
         type: 'final',
-        name: 'Final',
-        stageOrder: data.structureType === 'direct_final' ? 1 : 2,
+        name: 'Main Stage',
+        stageOrder: 1,
         advancementCount: null,
-        pointsCarryForward: data.structureType === 'direct_final'
-          ? false
-          : !config.pointsResetBeforeFinal,
+        pointsCarryForward: false,
         checkInDurationMin: data.checkInDurationMin,
       },
     });
-    const finalRoom = await db.tournamentRoom.create({
-      data: {
+
+    for (let roomOrder = 1; roomOrder <= config.roomCount; roomOrder += 1) {
+      const remaining = data.maxUnits - (roomOrder - 1) * roomCapacity;
+      const room = await db.tournamentRoom.create({
+        data: {
+          tournamentId,
+          stageId: stage.id,
+          name: `Room ${roomOrder}`,
+          maxUnits: Math.min(roomCapacity, remaining),
+          roomOrder,
+        },
+      });
+      matchNumber = await this.createMatches(
+        db,
         tournamentId,
-        stageId: finalStage.id,
-        name: 'Final Room',
-        maxUnits: Math.min(roomCapacity, data.maxUnits),
-        roomOrder: 1,
-      },
-    });
-    await this.createMatches(
-      db,
-      tournamentId,
-      finalStage.id,
-      finalRoom.id,
-      matchNumber,
-      config.finalMatches,
-      'final',
-      1,
-      data,
-    );
+        stage.id,
+        room.id,
+        matchNumber,
+        config.matchesPerRoom,
+        roomOrder,
+        data,
+      );
+    }
   }
 
   private async createMatches(
@@ -320,7 +283,6 @@ export class TournamentService {
     roomId: string,
     startNumber: number,
     count: number,
-    stage: 'qualifier' | 'final',
     roomOrder: number,
     data: CreateTournamentInput,
   ): Promise<number> {
@@ -328,7 +290,6 @@ export class TournamentService {
     for (let matchOrder = 1; matchOrder <= count; matchOrder += 1) {
       const scheduled = data.stageConfig!.matchSchedule.find(
         (entry) =>
-          entry.stage === stage &&
           entry.roomOrder === roomOrder &&
           entry.matchOrder === matchOrder,
       );

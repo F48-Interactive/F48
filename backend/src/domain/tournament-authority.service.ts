@@ -26,7 +26,7 @@ export const MODE_CAPACITY: Record<TournamentMode, number> = {
   squad: 12,
 };
 
-const MAX_QUALIFIER_ROOMS = 4;
+const MAX_ROOMS = 4;
 
 export const MODE_ROSTER_SIZE: Record<TournamentMode, number> = {
   solo: 1,
@@ -277,33 +277,23 @@ export class TournamentAuthorityService {
 
   private assertModeCapacity(
     mode: string,
-    structureType: string,
+    _structureType: string,
     maxUnits: number,
   ): void {
     const roomCapacity = this.modeCapacity(mode);
-    const maxCapacity = roomCapacity * MAX_QUALIFIER_ROOMS;
+    const maxCapacity = roomCapacity * MAX_ROOMS;
 
-    if (structureType === 'direct_final' && maxUnits > roomCapacity) {
+    if (maxUnits < 2 || maxUnits > maxCapacity) {
       throw new BadRequestError(
         ErrorCodes.CAPACITY_EXCEEDED,
-        `${mode} direct finals cannot exceed ${roomCapacity} registrations.`,
-      );
-    }
-
-    if (
-      structureType === 'qualifiers_to_final' &&
-      (maxUnits <= roomCapacity || maxUnits > maxCapacity)
-    ) {
-      throw new BadRequestError(
-        ErrorCodes.CAPACITY_EXCEEDED,
-        `${mode} qualifier tournaments must use ${roomCapacity + 1}-${maxCapacity} registrations.`,
+        `${mode} tournaments must use 2-${maxCapacity} registrations.`,
       );
     }
   }
 
   private assertStageConfig(data: CreateTournamentInput): void {
     const roomCapacity = this.modeCapacity(data.mode);
-    const expectedQualifierRooms = Math.ceil(data.maxUnits / roomCapacity);
+    const expectedRooms = Math.ceil(data.maxUnits / roomCapacity);
     const stageConfig = data.stageConfig;
 
     if (!stageConfig) {
@@ -313,36 +303,17 @@ export class TournamentAuthorityService {
       );
     }
 
-    if (data.structureType === 'direct_final') {
-      if (stageConfig.finalMatches < 1 || stageConfig.qualifierRooms !== 0) {
-        throw new BadRequestError(
-          ErrorCodes.VALIDATION_FAILED,
-          'Direct final tournaments must configure only final matches.',
-        );
-      }
-      return;
-    }
-
-    if (stageConfig.qualifierRooms !== expectedQualifierRooms) {
+    if (stageConfig.roomCount !== expectedRooms) {
       throw new BadRequestError(
         ErrorCodes.VALIDATION_FAILED,
-        `Qualifier room count must be ${expectedQualifierRooms}.`,
+        `Room count must be ${expectedRooms}.`,
       );
     }
 
-    if (stageConfig.qualifierMatchesPerRoom < 1) {
+    if (stageConfig.matchesPerRoom < 1) {
       throw new BadRequestError(
         ErrorCodes.VALIDATION_FAILED,
-        'Qualifier tournaments require matches per qualifier room.',
-      );
-    }
-
-    const finalists =
-      stageConfig.qualifierRooms * stageConfig.advancingPerQualifier;
-    if (finalists < 1 || finalists > roomCapacity) {
-      throw new BadRequestError(
-        ErrorCodes.CAPACITY_EXCEEDED,
-        `Finalists must fit one ${data.mode} final room.`,
+        'At least one match per room is required.',
       );
     }
   }

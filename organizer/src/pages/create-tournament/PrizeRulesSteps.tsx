@@ -93,7 +93,7 @@ export function PreviewStep({ form, organizerChannel }: Props) {
       <div className="review-grid">
         <Info label="Mode" value={`${form.mode.toUpperCase()} / ${form.maxUnits} ${MODE_LABEL[form.mode]}`} />
         <Info label="Rooms" value={`${roomCount(form)}`} />
-        <Info label="Structure" value={form.structureType.replace(/_/g, ' ')} />
+        <Info label="Matches" value={`${roomCount(form)} rooms x ${form.numberOfMatches}`} />
         <Info label="Scoring" value={SCORING_LABEL[form.scoringModel]} />
         <Info label="Kill value" value={form.pointsPerKill} />
         <Info label="Prize pool" value={pool > 0 ? `INR ${(pool / 100).toLocaleString()}` : 'No prize'} />

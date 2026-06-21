@@ -106,20 +106,18 @@ export function ModeStep({ form, setForm }: Props) {
 
 export function StructureStep({ form, setForm }: Props) {
   const rooms = roomCount(form);
+  const cap = MODE_CAPACITY[form.mode];
   return (
     <div className="create-step">
-      <h2>Tournament Structure</h2>
-      <Select label="Structure" value={form.structureType} onChange={(value) => setForm(refreshSchedule({ ...form, structureType: value as TournamentForm['structureType'] }))} options={[['direct_final', 'Direct Final'], ['qualifiers_to_final', 'Qualifiers to Final']]} />
-      {form.structureType === 'qualifiers_to_final' && (
-        <div className="field-grid">
-          <Info label="Qualifier rooms" value={`${rooms}`} />
-          <NumberField label="Matches per qualifier room" value={form.qualifierMatchesPerRoom} onChange={(value) => setForm(refreshSchedule({ ...form, qualifierMatchesPerRoom: value }))} />
-          <NumberField label="Advancing per qualifier" value={form.advancingPerQualifier} onChange={(value) => setForm({ ...form, advancingPerQualifier: value })} />
-        </div>
-      )}
+      <h2>Rooms and Matches</h2>
+      <p className="text-secondary">Rooms are calculated from capacity. Enter how many matches each room will play.</p>
+      <div className="info-grid">
+        <Info label="Calculated rooms" value={`${rooms}`} />
+        <Info label="Capacity per room" value={`${cap} ${MODE_LABEL[form.mode]}`} />
+        <Info label="Total scheduled matches" value={`${rooms * form.numberOfMatches}`} />
+      </div>
       <div className="field-grid">
-        <NumberField label="Final matches" value={form.finalMatches} onChange={(value) => setForm(refreshSchedule({ ...form, finalMatches: value }))} />
-        <label className="check-row"><input type="checkbox" checked={form.pointsResetBeforeFinal} onChange={(e) => setForm({ ...form, pointsResetBeforeFinal: e.target.checked })} /> Scores reset before final</label>
+        <NumberField label="Number of matches per room" value={form.numberOfMatches} onChange={(value) => setForm(refreshSchedule({ ...form, numberOfMatches: value }))} />
       </div>
     </div>
   );
@@ -130,7 +128,7 @@ function Field({ label, value, onChange, placeholder = '' }: { label: string; va
 }
 
 function NumberField({ label, value, onChange }: { label: string; value: number; onChange: (value: number) => void }) {
-  return <div className="input-group"><label className="input-label">{label}</label><input className="input" type="number" min="0" value={value} onChange={(e) => onChange(Number(e.target.value))} /></div>;
+  return <div className="input-group"><label className="input-label">{label}</label><input className="input" type="number" min="1" max="12" value={value} onChange={(e) => onChange(Number(e.target.value))} /></div>;
 }
 
 function TextArea({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
