@@ -1,0 +1,272 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// F48 Backend — Prisma Schema
+// ARCH-004: Prisma schema and migrations define database evolution.
+//           Direct production schema edits are prohibited.
+// ─────────────────────────────────────────────────────────────────────────────
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ENUMS
+// ─────────────────────────────────────────────────────────────────────────────
+
+enum UserRole {
+  player
+  organizer
+  admin
+  super_admin
+}
+
+enum UserStatus {
+  active
+  suspended
+  banned
+}
+
+enum PlayerStatus {
+  onboarding
+  active
+  suspended
+  banned
+}
+
+enum FfBindingStatus {
+  active
+  replaced
+  removed
+}
+
+enum OrgVerificationStatus {
+  profile_incomplete
+  verification_pending
+  verified
+  restricted
+  suspended
+}
+
+enum FundingEligibility {
+  not_eligible
+  eligible
+  suspended
+}
+
+enum VerificationDecision {
+  approved
+  rejected
+  restricted
+  suspended
+  reinstated
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// IDENTITY & AUTH (Phase 0/1 tables)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Internal account linked to Firebase subject (DATA-001).
+model User {
+  id          String     @id @default(uuid()) @db.Uuid
+  firebaseUid String     @unique @map("firebase_uid")
+  email       String
+  role        UserRole   @default(player)
+  status      UserStatus @default(active)
+  isDeleted   Boolean    @default(false) @map("is_deleted")
+  createdAt   DateTime   @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt   DateTime   @updatedAt @map("updated_at") @db.Timestamptz
+
+  // Relations
+  player    Player?
+  organizer Organizer?
+  auditLogs AuditLog[]
+
+  @@map("users")
+}
+
+/// Player profile with Platform ID (PLAYER-001/002).
+model Player {
+  id            String       @id @default(uuid()) @db.Uuid
+  userId        String       @unique @map("user_id") @db.Uuid
+  platformId    String       @unique @map("platform_id") @db.VarChar(9)
+  username      String       @unique @db.VarChar(20)
+  usernameLower String       @unique @map("username_lower") @db.VarChar(20)
+  displayName   String?      @map("display_name")
+  avatarAssetId String?      @map("avatar_asset_id") @db.Uuid
+  status        PlayerStatus @default(onboarding)
+  isDeleted     Boolean      @default(false) @map("is_deleted")
+  createdAt     DateTime     @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt     DateTime     @updatedAt @map("updated_at") @db.Timestamptz
+
+  // Relations
+  user       User              @relation(fields: [userId], references: [id])
+  ffBindings PlayerFfBinding[]
+
+  @@map("players")
+}
+
+/// Free Fire UID binding (PLAYER-004/005).
+/// Partial unique: only one active binding per UID at a time (DATA-007).
+model PlayerFfBinding {
+  id            String          @id @default(uuid()) @db.Uuid
+  playerId      String          @map("player_id") @db.Uuid
+  ffUid         String          @map("ff_uid")
+  ffNickname    String?         @map("ff_nickname")
+  ffRegion      String?         @map("ff_region")
+  ffLevel       Int?            @map("ff_level")
+  ffAccountData Json?           @map("ff_account_data")
+  status        FfBindingStatus @default(active)
+  boundAt       DateTime        @default(now()) @map("bound_at") @db.Timestamptz
+  unboundAt     DateTime?       @map("unbound_at") @db.Timestamptz
+  unboundReason String?         @map("unbound_reason")
+
+  // Relations
+  player Player @relation(fields: [playerId], references: [id])
+
+  // Partial unique constraint: only one active binding per UID globally.
+  // Prisma cannot express WHERE conditions — created as raw SQL in migration:
+  //   CREATE UNIQUE INDEX unique_active_ff_uid ON player_ff_bindings (ff_uid)
+  //     WHERE status = 'active';
+  @@index([playerId, status], name: "idx_ff_binding_player_status")
+  @@index([ffUid], name: "idx_ff_binding_uid")
+  @@map("player_ff_bindings")
+}
+
+/// Organizer profile with YouTube verification (ORG-ID-001/002).
+model Organizer {
+  id                          String              @id @default(uuid()) @db.Uuid
+  userId                      String              @unique @map("user_id") @db.Uuid
+  displayName                 String?             @map("display_name")
+  description                 String?
+  avatarAssetId               String?             @map("avatar_asset_id") @db.Uuid
+  verificationStatus          OrgVerificationStatus @default(profile_incomplete) @map("verification_status")
+  fundingEligibility          FundingEligibility  @default(not_eligible) @map("funding_eligibility")
+  verifiedAt                  DateTime?           @map("verified_at") @db.Timestamptz
+  verifiedBy                  String?             @map("verified_by") @db.Uuid
+  totalTournamentsCompleted   Int                 @default(0) @map("total_tournaments_completed")
+  totalPrizesDistributedPaise BigInt              @default(0) @map("total_prizes_distributed_paise")
+  isDeleted                   Boolean             @default(false) @map("is_deleted")
+  createdAt                   DateTime            @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt                   DateTime            @updatedAt @map("updated_at") @db.Timestamptz
+
+  // Relations
+  user                 User                        @relation(fields: [userId], references: [id])
+  youtubeChannels      OrganizerYoutubeChannel[]
+  verificationDecisions OrgVerificationDecision[]
+
+  @@map("organizers")
+}
+
+/// YouTube channel data fetched server-side (ORG-ID-002).
+model OrganizerYoutubeChannel {
+  id              String   @id @default(uuid()) @db.Uuid
+  organizerId     String   @map("organizer_id") @db.Uuid
+  channelId       String   @map("channel_id")
+  channelName     String?  @map("channel_name")
+  handle          String?
+  url             String?
+  imageUrl        String?  @map("image_url")
+  subscriberCount Int?     @map("subscriber_count")
+  videoCount      Int?     @map("video_count")
+  rawChannelData  Json?    @map("raw_channel_data")
+  status          String   @default("active")
+  fetchedAt       DateTime @default(now()) @map("fetched_at") @db.Timestamptz
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  // Relations
+  organizer Organizer @relation(fields: [organizerId], references: [id])
+
+  @@map("organizer_youtube_channels")
+}
+
+/// Immutable verification decision record (ORG-ID-003).
+model OrgVerificationDecision {
+  id          String               @id @default(uuid()) @db.Uuid
+  organizerId String               @map("organizer_id") @db.Uuid
+  decision    VerificationDecision
+  reason      String
+  reviewerId  String               @map("reviewer_id") @db.Uuid
+  createdAt   DateTime             @default(now()) @map("created_at") @db.Timestamptz
+
+  // Relations
+  organizer Organizer @relation(fields: [organizerId], references: [id])
+
+  @@map("organizer_verification_decisions")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PLATFORM & AUDIT (Phase 0 tables)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Immutable audit log (ADMIN-011, DATA-004).
+model AuditLog {
+  id            String   @id @default(uuid()) @db.Uuid
+  actorId       String   @map("actor_id") @db.Uuid
+  actorRole     String   @map("actor_role")
+  action        String
+  resourceType  String   @map("resource_type")
+  resourceId    String   @map("resource_id")
+  oldValue      Json?    @map("old_value")
+  newValue      Json?    @map("new_value")
+  reason        String?
+  ipAddress     String?  @map("ip_address")
+  userAgent     String?  @map("user_agent")
+  correlationId String?  @map("correlation_id")
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  // Relations
+  actor User @relation(fields: [actorId], references: [id])
+
+  @@index([resourceType, resourceId])
+  @@index([actorId])
+  @@index([action])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+/// Status transition history (LIFE-002).
+model StatusHistory {
+  id             String   @id @default(uuid()) @db.Uuid
+  resourceType   String   @map("resource_type")
+  resourceId     String   @map("resource_id")
+  previousStatus String   @map("previous_status")
+  newStatus      String   @map("new_status")
+  reason         String?
+  actorId        String   @map("actor_id") @db.Uuid
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  @@index([resourceType, resourceId])
+  @@index([createdAt])
+  @@map("status_history")
+}
+
+/// Feature flags (ADMIN-012).
+model FeatureFlag {
+  id          String   @id @default(uuid()) @db.Uuid
+  key         String   @unique
+  value       Boolean  @default(false)
+  description String?
+  updatedBy   String?  @map("updated_by") @db.Uuid
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@map("feature_flags")
+}
+
+/// Idempotency key storage (ARCH-006).
+model IdempotencyKey {
+  id             String   @id @default(uuid()) @db.Uuid
+  key            String   @unique
+  resourceType   String   @map("resource_type")
+  resourceId     String?  @map("resource_id")
+  responseStatus Int      @map("response_status")
+  responseBody   Json?    @map("response_body")
+  expiresAt      DateTime @map("expires_at") @db.Timestamptz
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  @@index([expiresAt])
+  @@map("idempotency_keys")
+}
