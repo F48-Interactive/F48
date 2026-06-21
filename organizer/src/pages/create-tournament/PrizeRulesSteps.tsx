@@ -1,7 +1,7 @@
 import type { OrganizerYoutubeChannel } from '../../contexts/auth-types';
-import { MODE_CAPACITY, MODE_LABEL, SCORING_LABEL, TIEBREAKER_OPTIONS } from './constants';
+import { CORE_RULES, MODE_CAPACITY, MODE_LABEL, SCORING_LABEL, TIEBREAKER_OPTIONS } from './constants';
 import { roomCount, rupeesToPaise } from './helpers';
-import type { PrizeRow, SpecialPrizeRow, TournamentForm } from './types';
+import type { PrizeRow, TournamentForm } from './types';
 
 interface Props {
   form: TournamentForm;
@@ -17,9 +17,6 @@ export function PrizeStep({ form, setForm }: Props) {
   );
   const updatePrize = (index: number, patch: Partial<PrizeRow>) => {
     setForm({ ...form, prizeRows: form.prizeRows.map((row, i) => i === index ? { ...row, ...patch } : row) });
-  };
-  const updateSpecial = (index: number, patch: Partial<SpecialPrizeRow>) => {
-    setForm({ ...form, specialPrizes: form.specialPrizes.map((row, i) => i === index ? { ...row, ...patch } : row) });
   };
 
   if (form.fundingType === 'free') {
@@ -43,19 +40,6 @@ export function PrizeStep({ form, setForm }: Props) {
         ))}
       </div>
       <button type="button" className="btn btn-secondary" onClick={() => setForm({ ...form, prizeRows: [...form.prizeRows, { rank: form.prizeRows.length + 1, amountRupees: '' }] })}>Add leaderboard prize</button>
-      <div className="subsection">
-        <h3>Special prizes</h3>
-        <p className="text-secondary">Saved as tournament rules metadata. Leaderboard prize rows must still cover the official backend prize pool for this release.</p>
-        {form.specialPrizes.map((row, index) => (
-          <div className="special-row" key={index}>
-            <input className="input" placeholder="Prize name" value={row.name} onChange={(e) => updateSpecial(index, { name: e.target.value })} />
-            <input className="input" placeholder="Calculation type" value={row.calculationType} onChange={(e) => updateSpecial(index, { calculationType: e.target.value })} />
-            <input className="input" type="number" placeholder="Amount INR" value={row.amountRupees} onChange={(e) => updateSpecial(index, { amountRupees: e.target.value })} />
-            <button type="button" className="btn btn-ghost btn-sm" onClick={() => setForm({ ...form, specialPrizes: form.specialPrizes.filter((_, i) => i !== index) })}>Remove</button>
-          </div>
-        ))}
-        <button type="button" className="btn btn-secondary" onClick={() => setForm({ ...form, specialPrizes: [...form.specialPrizes, { name: '', calculationType: 'highest_kill_player', amountRupees: '', tieBreaker: 'total_kills' }] })}>Add special prize</button>
-      </div>
       {pool !== total && <p className="form-error">Official leaderboard prize rows must equal the total prize pool before publishing.</p>}
     </div>
   );
@@ -64,15 +48,12 @@ export function PrizeStep({ form, setForm }: Props) {
 export function RulesStep({ form, setForm }: Props) {
   return (
     <div className="create-step">
-      <h2>Rules, Penalties, and Disputes</h2>
+      <h2>Safety and Disputes</h2>
       <CoreRules />
-      <TextArea label="Organizer rules" value={form.rulesText} onChange={(value) => setForm({ ...form, rulesText: value })} />
-      <TextArea label="Penalty options" value={form.penaltyRules} onChange={(value) => setForm({ ...form, penaltyRules: value })} />
       <div className="field-grid">
         <NumberField label="Dispute window (hours)" value={form.disputeWindowHours} onChange={(value) => setForm({ ...form, disputeWindowHours: value })} />
         <TextArea label="Evidence requirements" value={form.evidenceRequirements} onChange={(value) => setForm({ ...form, evidenceRequirements: value })} />
       </div>
-      <label className="check-row"><input type="checkbox" checked={form.resultsAutoFinalize} onChange={(e) => setForm({ ...form, resultsAutoFinalize: e.target.checked })} /> Results become final automatically after dispute window</label>
     </div>
   );
 }
@@ -86,7 +67,7 @@ export function PreviewStep({ form, organizerChannel }: Props) {
         {form.bannerUrl && <img src={form.bannerUrl} alt="" className="preview-banner" />}
         <div className="preview-main">
           <h3>{form.title || 'Untitled tournament'}</h3>
-          <p>{form.shortDescription || form.fullDescription || 'No description yet.'}</p>
+          <p>{form.shortDescription || 'No description yet.'}</p>
           {organizerChannel && <span className="badge badge-mode">By {organizerChannel.channelName}</span>}
         </div>
       </div>
@@ -107,7 +88,7 @@ export function PreviewStep({ form, organizerChannel }: Props) {
 function CoreRules() {
   return (
     <div className="core-rules">
-      {['Fake accounts', 'Duplicate Free Fire UID', 'Unregistered players', 'Cheating', 'Collusion', 'Teaming', 'Abusive behaviour', 'Evidence manipulation'].map((rule) => (
+      {CORE_RULES.map((rule) => (
         <span key={rule} className="badge badge-muted">{rule}</span>
       ))}
     </div>

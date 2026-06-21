@@ -1,17 +1,13 @@
 import type { ScoringModel, TournamentMode } from './types';
 
 export const STEPS = [
-  'Type',
-  'Details',
-  'Mode',
-  'Structure',
-  'Slot Booking',
-  'Operations',
+  'Money',
+  'Identity',
+  'Slots',
   'Scoring',
-  'Tie-breakers',
   'Prizes',
-  'Rules',
-  'Preview',
+  'Safety',
+  'Review',
 ] as const;
 
 export const MODE_CAPACITY: Record<TournamentMode, number> = {
@@ -55,3 +51,14 @@ export const SCORING_LABEL: Record<ScoringModel, string> = {
 };
 
 export const SQUAD_BALANCED = [12, 9, 8, 7, 6, 5, 4, 3, 2, 1, 1, 0];
+
+export const CORE_RULES = [
+  'Fake accounts',
+  'Duplicate Free Fire UID',
+  'Unregistered players',
+  'Cheating',
+  'Collusion',
+  'Teaming',
+  'Abusive behaviour',
+  'Evidence manipulation',
+];

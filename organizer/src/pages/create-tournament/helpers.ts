@@ -1,10 +1,11 @@
 import {
+  CORE_RULES,
   MODE_CAPACITY,
   REQUIRED_TIEBREAKERS,
   SQUAD_BALANCED,
   TEAM_SIZE,
 } from './constants';
-import type { MatchScheduleRow, TournamentForm, TournamentMode } from './types';
+import type { TournamentForm, TournamentMode } from './types';
 
 export function defaultPlacement(mode: TournamentMode): string[] {
   const slots = MODE_CAPACITY[mode];
@@ -19,42 +20,19 @@ export function defaultForm(): TournamentForm {
   return {
     title: '',
     shortDescription: '',
-    fullDescription: '',
     bannerUrl: '',
-    visibility: 'public',
-    inviteCode: '',
-    hideInviteOnly: false,
-    livestreamUrl: '',
-    discordUrl: '',
-    whatsappUrl: '',
-    organizerInstructions: '',
     fundingType: 'free',
     prizePoolRupees: '',
     mode: 'squad',
     maxUnits: 12,
     numberOfMatches: 6,
-    registrationApproval: 'automatic',
-    mobileOnly: true,
-    regionRestriction: '',
-    minimumAccountLevel: '',
-    checkInDurationMin: 20,
-    roomReleaseMode: 'manual',
-    joiningDeadlineMin: 10,
-    matchSchedule: generateSchedule('squad', 12, 6),
     scoringModel: 'combined',
     pointsPerKill: '1.00',
-    maxKillPoints: '',
-    displayIndividualKills: true,
-    displayTeamKills: true,
     placementPoints: defaultPlacement('squad'),
     tiebreakers: [...REQUIRED_TIEBREAKERS],
     prizeRows: [],
-    specialPrizes: [],
-    rulesText: '',
-    penaltyRules: '',
     disputeWindowHours: 24,
     evidenceRequirements: 'Screenshot or video evidence is required.',
-    resultsAutoFinalize: true,
   };
 }
 
@@ -75,49 +53,14 @@ export function updateMode(form: TournamentForm, mode: TournamentMode): Tourname
     mode,
     maxUnits,
     placementPoints: defaultPlacement(mode),
-    matchSchedule: generateSchedule(mode, maxUnits, form.numberOfMatches),
   };
-}
-
-export function refreshSchedule(form: TournamentForm): TournamentForm {
-  return {
-    ...form,
-    matchSchedule: generateSchedule(form.mode, form.maxUnits, form.numberOfMatches),
-  };
-}
-
-export function generateSchedule(
-  mode: TournamentMode,
-  maxUnits: number,
-  numberOfMatches: number,
-): MatchScheduleRow[] {
-  const rows: MatchScheduleRow[] = [];
-  const rooms = Math.ceil(maxUnits / MODE_CAPACITY[mode]);
-  for (let roomOrder = 1; roomOrder <= rooms; roomOrder += 1) {
-    for (let matchOrder = 1; matchOrder <= numberOfMatches; matchOrder += 1) {
-      rows.push(row(roomOrder, matchOrder));
-    }
-  }
-  return rows;
-}
-
-function row(
-  roomOrder: number,
-  matchOrder: number,
-): MatchScheduleRow {
-  return { roomOrder, matchOrder };
 }
 
 export function prizeTotal(form: TournamentForm): number {
-  const leaderboard = form.prizeRows.reduce(
+  return form.prizeRows.reduce(
     (sum, row) => sum + rupeesToPaise(row.amountRupees),
     0,
   );
-  const special = form.specialPrizes.reduce(
-    (sum, row) => sum + rupeesToPaise(row.amountRupees),
-    0,
-  );
-  return leaderboard + special;
 }
 
 export function leaderboardPrizeRules(form: TournamentForm) {
@@ -140,42 +83,21 @@ export function placementPayload(form: TournamentForm) {
 export function metadata(form: TournamentForm): string {
   return JSON.stringify({
     version: 1,
-    visibility: form.visibility,
-    inviteCode: form.inviteCode || null,
-    hideInviteOnly: form.hideInviteOnly,
-    bannerUrl: form.bannerUrl || null,
-    livestreamUrl: form.livestreamUrl || null,
-    discordUrl: form.discordUrl || null,
-    whatsappUrl: form.whatsappUrl || null,
-    organizerInstructions: form.organizerInstructions || null,
-    registration: {
-      approval: form.registrationApproval,
-      mobileOnly: form.mobileOnly,
-      regionRestriction: form.regionRestriction || null,
-      minimumAccountLevel: form.minimumAccountLevel || null,
+    identity: {
+      bannerUrl: form.bannerUrl || null,
+      shortDescription: form.shortDescription,
+    },
+    slotBooking: {
       slotBookedBy: form.mode === 'solo' ? 'player' : 'team_leader',
       slotUnit: form.mode === 'solo' ? 'player' : 'team',
       teamSize: TEAM_SIZE[form.mode],
       fullTeamRequiredAtSlotBooking: form.mode !== 'solo',
       closesWhen: 'full_or_organizer_hold',
     },
-    schedule: {
-      roomReleaseMode: form.roomReleaseMode,
-      joiningDeadlineMin: form.joiningDeadlineMin,
-      matches: form.matchSchedule.map(({ roomOrder, matchOrder }) => ({
-        roomOrder,
-        matchOrder,
-      })),
+    safety: {
+      coreRules: CORE_RULES,
+      disputeWindowHours: form.disputeWindowHours,
+      evidenceRequirements: form.evidenceRequirements,
     },
-    scoring: {
-      maxKillPoints: form.maxKillPoints || null,
-      displayIndividualKills: form.displayIndividualKills,
-      displayTeamKills: form.displayTeamKills,
-    },
-    specialPrizes: form.specialPrizes,
-    rulesText: form.rulesText,
-    penaltyRules: form.penaltyRules,
-    evidenceRequirements: form.evidenceRequirements,
-    resultsAutoFinalize: form.resultsAutoFinalize,
   });
 }

@@ -30,6 +30,16 @@ export function ScoringStep({ form, setForm }: Props) {
     );
     setForm({ ...form, placementPoints });
   };
+  const available = TIEBREAKER_OPTIONS.filter(
+    (option) => !form.tiebreakers.includes(option.value),
+  );
+  const moveTieBreaker = (index: number, direction: -1 | 1) => {
+    const next = [...form.tiebreakers];
+    const target = index + direction;
+    if (target < 0 || target >= next.length) return;
+    [next[index], next[target]] = [next[target]!, next[index]!];
+    setForm({ ...form, tiebreakers: next });
+  };
 
   return (
     <div className="create-step">
@@ -47,14 +57,6 @@ export function ScoringStep({ form, setForm }: Props) {
           <label className="input-label">Points per kill</label>
           <input className="input" type="number" min="0" step="0.01" disabled={form.scoringModel === 'placement_only'} value={form.pointsPerKill} onChange={(e) => setForm({ ...form, pointsPerKill: e.target.value })} />
         </div>
-        <div className="input-group">
-          <label className="input-label">Optional max kill points per match</label>
-          <input className="input" type="number" min="0" value={form.maxKillPoints} onChange={(e) => setForm({ ...form, maxKillPoints: e.target.value })} />
-        </div>
-      </div>
-      <div className="check-grid">
-        <Check label="Display individual player kills" checked={form.displayIndividualKills} onChange={(checked) => setForm({ ...form, displayIndividualKills: checked })} />
-        <Check label="Display team kills" checked={form.displayTeamKills} onChange={(checked) => setForm({ ...form, displayTeamKills: checked })} />
       </div>
       <div className="placement-tools">
         <strong>Placement points ({slots} positions)</strong>
@@ -68,33 +70,17 @@ export function ScoringStep({ form, setForm }: Props) {
           </label>
         ))}
       </div>
-    </div>
-  );
-}
-
-export function TiebreakStep({ form, setForm }: Props) {
-  const available = TIEBREAKER_OPTIONS.filter(
-    (option) => !form.tiebreakers.includes(option.value),
-  );
-  const move = (index: number, direction: -1 | 1) => {
-    const next = [...form.tiebreakers];
-    const target = index + direction;
-    if (target < 0 || target >= next.length) return;
-    [next[index], next[target]] = [next[target]!, next[index]!];
-    setForm({ ...form, tiebreakers: next });
-  };
-
-  return (
-    <div className="create-step">
-      <h2>Tie-breakers</h2>
-      <p className="text-secondary">Total points rank first. These rules are applied in order when points tie.</p>
+      <div className="subsection">
+        <h3>Tie-breakers</h3>
+        <p className="text-secondary">Total points rank first. These rules are applied in order when points tie.</p>
+      </div>
       <div className="tiebreak-list">
         {form.tiebreakers.map((field, index) => (
           <div className="tiebreak-row" key={field}>
             <span>{index + 1}. {labelFor(field)}</span>
             <div>
-              <button type="button" className="btn btn-ghost btn-sm" onClick={() => move(index, -1)}>Up</button>
-              <button type="button" className="btn btn-ghost btn-sm" onClick={() => move(index, 1)}>Down</button>
+              <button type="button" className="btn btn-ghost btn-sm" onClick={() => moveTieBreaker(index, -1)}>Up</button>
+              <button type="button" className="btn btn-ghost btn-sm" onClick={() => moveTieBreaker(index, 1)}>Down</button>
               <button type="button" className="btn btn-ghost btn-sm" onClick={() => setForm({ ...form, tiebreakers: form.tiebreakers.filter((item) => item !== field) })}>Remove</button>
             </div>
           </div>
@@ -118,8 +104,4 @@ function description(model: ScoringModel): string {
 
 function labelFor(value: string): string {
   return TIEBREAKER_OPTIONS.find((option) => option.value === value)?.label ?? value;
-}
-
-function Check({ label, checked, onChange }: { label: string; checked: boolean; onChange: (checked: boolean) => void }) {
-  return <label className="check-row"><input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} /> {label}</label>;
 }

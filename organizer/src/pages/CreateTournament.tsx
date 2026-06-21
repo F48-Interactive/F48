@@ -7,14 +7,9 @@ import { STEPS } from './create-tournament/constants';
 import {
   DetailsStep,
   ModeStep,
-  StructureStep,
   TypeStep,
 } from './create-tournament/BasicsSteps';
-import {
-  RegistrationStep,
-  ScheduleStep,
-} from './create-tournament/OperationsSteps';
-import { ScoringStep, TiebreakStep } from './create-tournament/ScoringSteps';
+import { ScoringStep } from './create-tournament/ScoringSteps';
 import {
   PreviewStep,
   PrizeStep,
@@ -207,27 +202,22 @@ function renderStep(
   if (step === 0) return <TypeStep {...props} />;
   if (step === 1) return <DetailsStep {...props} />;
   if (step === 2) return <ModeStep {...props} />;
-  if (step === 3) return <StructureStep {...props} />;
-  if (step === 4) return <RegistrationStep {...props} />;
-  if (step === 5) return <ScheduleStep {...props} />;
-  if (step === 6) return <ScoringStep {...props} />;
-  if (step === 7) return <TiebreakStep {...props} />;
-  if (step === 8) return <PrizeStep {...props} />;
-  if (step === 9) return <RulesStep {...props} />;
+  if (step === 3) return <ScoringStep {...props} />;
+  if (step === 4) return <PrizeStep {...props} />;
+  if (step === 5) return <RulesStep {...props} />;
   return <PreviewStep {...props} />;
 }
 
 function tournamentPayload(form: TournamentForm) {
   return {
     title: form.title.trim(),
-    description: [form.shortDescription, form.fullDescription].filter(Boolean).join('\n\n'),
+    description: form.shortDescription.trim(),
     mode: form.mode,
     fundingType: form.fundingType,
     structureType: 'direct_final',
     scoringModel: form.scoringModel,
     maxUnits: form.maxUnits,
     prizePoolPaise: form.fundingType === 'free' ? undefined : rupeesToPaise(form.prizePoolRupees),
-    checkInDurationMin: form.checkInDurationMin,
     disputeWindowHours: form.disputeWindowHours,
     rulesText: metadata(form),
     stageConfig: {
@@ -258,9 +248,11 @@ function validate(form: TournamentForm, publish: boolean): string[] {
   if (form.placementPoints[form.placementPoints.length - 1] !== '0') errors.push('Last placement position must be zero.');
   if (new Set(form.tiebreakers).size !== form.tiebreakers.length) errors.push('Tie-breakers cannot repeat.');
   if (form.tiebreakers.length < 3) errors.push('Required tie-breakers are missing.');
+  if (form.evidenceRequirements.trim().length < 3) errors.push('Evidence requirements are required.');
 
   if (publish) {
     if (!form.bannerUrl.trim()) errors.push('Tournament banner URL is required before publishing.');
+    if (form.shortDescription.trim().length < 3) errors.push('Short description is required.');
     if (form.fundingType !== 'free' && leaderboardTotal(form) !== rupeesToPaise(form.prizePoolRupees)) {
       errors.push('Official leaderboard prize rows must sum exactly to the prize pool.');
     }
@@ -273,21 +265,26 @@ function validateStep(form: TournamentForm, step: number): string[] {
     if (form.fundingType === 'entry_fee') return ['Entry-fee tournaments are coming later.'];
     if (form.fundingType !== 'free' && rupeesToPaise(form.prizePoolRupees) <= 0) return ['Prize pool is required.'];
   }
-  if (step === 1 && form.title.trim().length < 3) return ['Tournament name is required.'];
-  if (step === 3) {
+  if (step === 1) {
+    if (form.title.trim().length < 3) return ['Tournament name is required.'];
+    if (form.shortDescription.trim().length < 3) return ['Short description is required.'];
+  }
+  if (step === 2) {
     if (roomCount(form) > 4) return ['Tournament capacity cannot exceed four rooms.'];
     if (form.numberOfMatches < 1 || form.numberOfMatches > 12) return ['Number of matches must be between 1 and 12.'];
   }
-  if (step === 6 && form.scoringModel !== 'placement_only' && Number(form.pointsPerKill) <= 0) {
+  if (step === 3 && form.scoringModel !== 'placement_only' && Number(form.pointsPerKill) <= 0) {
     return ['Kill points must be greater than zero.'];
   }
-  if (step === 7 && form.tiebreakers.length < 3) return ['Required tie-breakers are missing.'];
   if (
-    step === 8 &&
+    step === 4 &&
     form.fundingType !== 'free' &&
     leaderboardTotal(form) !== rupeesToPaise(form.prizePoolRupees)
   ) {
     return ['Official leaderboard prize rows must sum exactly to the prize pool.'];
+  }
+  if (step === 5 && form.evidenceRequirements.trim().length < 3) {
+    return ['Evidence requirements are required.'];
   }
   return [];
 }
