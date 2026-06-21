@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { api, getErrorMessage, idempotencyKey } from '../lib/api';
 import { StatusBadge } from '../components/StatusBadge';
+import { TournamentMatchPanel } from './TournamentMatchPanel';
 import {
   AlertTriangle,
   ArrowLeft,
@@ -203,7 +204,9 @@ export function TournamentWorkspace() {
         )}
 
         {activeTab === 'participants' && <EmptyTab icon={Users} title="Participants" desc="Slot bookings will appear here once bookings open." />}
-        {activeTab === 'matches' && <EmptyTab icon={Swords} title="Matches" desc="Match management will be available during the live phase." />}
+        {activeTab === 'matches' && (
+          <TournamentMatchPanel tournamentId={tournament.id} />
+        )}
         {activeTab === 'leaderboard' && <EmptyTab icon={TrophyIcon} title="Leaderboard" desc="Standings will appear after results are submitted." />}
         {activeTab === 'disputes' && <EmptyTab icon={AlertTriangle} title="Disputes" desc="No disputes filed for this tournament." />}
       </div>

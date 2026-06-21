@@ -36,7 +36,7 @@ export class MatchService {
   ) {
     const match = await this.authority.getManagedMatch(user, matchId);
 
-    if (!['scheduled', 'check_in'].includes(match.status)) {
+    if (!['scheduled', 'check_in', 'room_released'].includes(match.status)) {
       throw new BadRequestError(
         ErrorCodes.VALIDATION_FAILED,
         `Cannot set credentials in ${match.status}.`,

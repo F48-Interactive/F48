@@ -108,6 +108,12 @@ export class MatchAuthorityService {
     let booyahCount = 0;
 
     for (const row of playerResults) {
+      if (!Number.isInteger(row.placement) || !Number.isInteger(row.kills)) {
+        throw new BadRequestError(
+          ErrorCodes.VALIDATION_FAILED,
+          'Placement and kills must be whole numbers.',
+        );
+      }
       if (registrationIds.has(row.registrationId)) {
         throw new BadRequestError(
           ErrorCodes.DUPLICATE_RESOURCE,

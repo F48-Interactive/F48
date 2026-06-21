@@ -40,6 +40,12 @@ export class RegistrationService {
           tournamentId,
           tournament.maxUnits,
         );
+        await this.holdTournamentIfFull(
+          db,
+          tournamentId,
+          slotNumber,
+          tournament.maxUnits,
+        );
 
         return db.registration.create({
           data: {
@@ -272,6 +278,13 @@ export class RegistrationService {
             registration.tournament.maxUnits,
           );
 
+          await this.holdTournamentIfFull(
+            db,
+            registration.tournamentId,
+            slotNumber,
+            registration.tournament.maxUnits,
+          );
+
           await db.registration.update({
             where: { id: registrationId },
             data: { status: 'confirmed', slotNumber },
@@ -299,5 +312,19 @@ export class RegistrationService {
       }),
     ]);
     return { items, total, page, limit };
+  }
+
+  private async holdTournamentIfFull(
+    db: PrismaService,
+    tournamentId: string,
+    slotNumber: number,
+    maxUnits: number,
+  ): Promise<void> {
+    if (slotNumber < maxUnits) return;
+
+    await db.tournament.updateMany({
+      where: { id: tournamentId, status: 'registration_open' },
+      data: { status: 'registration_closed', registrationCloseAt: new Date() },
+    });
   }
 }

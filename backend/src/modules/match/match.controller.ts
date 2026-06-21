@@ -74,17 +74,17 @@ export class MatchController {
     );
   }
 
-  @Get(':id')
-  @Public()
-  @ApiOperation({ summary: 'Get match details with results' })
-  async getMatch(@Param('id') id: string) {
-    return this.matchService.getMatch(id);
-  }
-
   @Get('tournament/:tournamentId')
   @Public()
   @ApiOperation({ summary: 'List matches for tournament' })
   async listByTournament(@Param('tournamentId') tournamentId: string) {
     return this.matchService.listByTournament(tournamentId);
+  }
+
+  @Get(':id')
+  @Public()
+  @ApiOperation({ summary: 'Get match details with results' })
+  async getMatch(@Param('id') id: string) {
+    return this.matchService.getMatch(id);
   }
 }
