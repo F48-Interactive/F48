@@ -1,8 +1,8 @@
 const STATUS_MAP: Record<string, { className: string; label: string }> = {
   draft:                { className: 'badge-draft',     label: 'Draft' },
   published:            { className: 'badge-published', label: 'Published' },
-  registration_open:    { className: 'badge-open',      label: 'Registration Open' },
-  registration_closed:  { className: 'badge-warning',   label: 'Registration Closed' },
+  registration_open:    { className: 'badge-open',      label: 'Bookings Open' },
+  registration_closed:  { className: 'badge-warning',   label: 'Bookings Held' },
   check_in:             { className: 'badge-warning',   label: 'Check-in' },
   live:                 { className: 'badge-live',       label: 'LIVE' },
   provisional_results:  { className: 'badge-warning',   label: 'Provisional Results' },

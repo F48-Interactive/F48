@@ -41,14 +41,10 @@ export interface TournamentForm {
   maxUnits: number;
   numberOfMatches: number;
   registrationOpenAt: string;
-  registrationCloseAt: string;
-  rosterLockAt: string;
   registrationApproval: RegistrationApproval;
-  substitutesAllowed: number;
   mobileOnly: boolean;
   regionRestriction: string;
   minimumAccountLevel: string;
-  lateRegistrationAllowed: boolean;
   checkInDurationMin: number;
   roomReleaseMode: 'manual' | 'scheduled';
   joiningDeadlineMin: number;

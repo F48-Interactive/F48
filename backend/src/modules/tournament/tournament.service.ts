@@ -78,9 +78,6 @@ export class TournamentService {
           registrationOpenAt: data.registrationOpenAt
             ? new Date(data.registrationOpenAt)
             : null,
-          registrationCloseAt: data.registrationCloseAt
-            ? new Date(data.registrationCloseAt)
-            : null,
           checkInDurationMin: data.checkInDurationMin,
           disputeWindowHours: data.disputeWindowHours ?? 24,
           gameMapId: data.gameMapId,
@@ -149,9 +146,6 @@ export class TournamentService {
         }),
         ...(data.registrationOpenAt !== undefined && {
           registrationOpenAt: new Date(data.registrationOpenAt),
-        }),
-        ...(data.registrationCloseAt !== undefined && {
-          registrationCloseAt: new Date(data.registrationCloseAt),
         }),
         ...(data.checkInDurationMin !== undefined && {
           checkInDurationMin: data.checkInDurationMin,

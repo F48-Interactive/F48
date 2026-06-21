@@ -13,21 +13,18 @@ export function RegistrationStep({ form, setForm }: Props) {
       <div className="info-grid">
         <Info label="Booking rule" value={bookingRule(form)} />
         <Info label="Team requirement" value={teamRequirement(form)} />
+        <Info label="Booking closes" value="When full or held manually" />
       </div>
       <div className="field-grid">
         <DateField label="Slot booking opens" value={form.registrationOpenAt} onChange={(value) => setForm({ ...form, registrationOpenAt: value })} />
-        <DateField label="Slot booking closes" value={form.registrationCloseAt} onChange={(value) => setForm({ ...form, registrationCloseAt: value })} />
-        <DateField label="Team edit lock" value={form.rosterLockAt} onChange={(value) => setForm({ ...form, rosterLockAt: value })} />
       </div>
       <div className="field-grid">
         <Select label="Slot booking approval" value={form.registrationApproval} onChange={(value) => setForm({ ...form, registrationApproval: value as TournamentForm['registrationApproval'] })} options={[['automatic', 'Automatic'], ['organizer_approval', 'Organizer approval required']]} />
-        <NumberField label="Substitutes allowed" value={form.substitutesAllowed} onChange={(value) => setForm({ ...form, substitutesAllowed: value })} />
         <Field label="Region restriction" value={form.regionRestriction} onChange={(value) => setForm({ ...form, regionRestriction: value })} placeholder="Optional" />
         <Field label="Minimum FF level" value={form.minimumAccountLevel} onChange={(value) => setForm({ ...form, minimumAccountLevel: value })} placeholder="Optional" />
       </div>
       <div className="check-grid">
         <Check label="Mobile only" checked={form.mobileOnly} onChange={(checked) => setForm({ ...form, mobileOnly: checked })} />
-        <Check label="Late slot booking allowed" checked={form.lateRegistrationAllowed} onChange={(checked) => setForm({ ...form, lateRegistrationAllowed: checked })} />
       </div>
     </div>
   );

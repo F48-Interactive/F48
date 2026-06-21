@@ -5,7 +5,7 @@ export const STEPS = [
   'Details',
   'Mode',
   'Structure',
-  'Registration',
+  'Slot Booking',
   'Schedule',
   'Scoring',
   'Tie-breakers',

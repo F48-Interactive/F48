@@ -68,7 +68,6 @@ export class TournamentAuthorityService {
     );
     this.assertScheduleShape(
       data.registrationOpenAt,
-      data.registrationCloseAt,
       data.scheduledStartAt,
     );
   }
@@ -98,7 +97,6 @@ export class TournamentAuthorityService {
     assertFundingShape(nextFundingType, nextEntryFee, nextPrizePool);
     this.assertScheduleShape(
       data.registrationOpenAt,
-      data.registrationCloseAt,
       data.scheduledStartAt,
     );
   }
@@ -146,7 +144,6 @@ export class TournamentAuthorityService {
           maxUnits: true,
           scheduledStartAt: true,
           registrationOpenAt: true,
-          registrationCloseAt: true,
         },
       });
 
@@ -173,12 +170,11 @@ export class TournamentAuthorityService {
 
       if (
         !tournament.registrationOpenAt ||
-        !tournament.registrationCloseAt ||
         !tournament.scheduledStartAt
       ) {
         throw new BadRequestError(
           ErrorCodes.VALIDATION_FAILED,
-          'Registration and match schedule dates are required before publishing.',
+          'Slot booking open time and match schedule are required before publishing.',
         );
       }
 
@@ -286,7 +282,7 @@ export class TournamentAuthorityService {
     if (maxUnits < 2 || maxUnits > maxCapacity) {
       throw new BadRequestError(
         ErrorCodes.CAPACITY_EXCEEDED,
-        `${mode} tournaments must use 2-${maxCapacity} registrations.`,
+        `${mode} tournaments must use 2-${maxCapacity} slots.`,
       );
     }
   }
@@ -320,27 +316,15 @@ export class TournamentAuthorityService {
 
   private assertScheduleShape(
     registrationOpenAt?: string,
-    registrationCloseAt?: string,
     scheduledStartAt?: string,
   ): void {
-    if (registrationOpenAt && registrationCloseAt) {
+    if (registrationOpenAt && scheduledStartAt) {
       const opensAt = new Date(registrationOpenAt).getTime();
-      const closesAt = new Date(registrationCloseAt).getTime();
-      if (opensAt >= closesAt) {
-        throw new BadRequestError(
-          ErrorCodes.VALIDATION_FAILED,
-          'Registration close time must be after open time.',
-        );
-      }
-    }
-
-    if (registrationCloseAt && scheduledStartAt) {
-      const closesAt = new Date(registrationCloseAt).getTime();
       const startsAt = new Date(scheduledStartAt).getTime();
-      if (closesAt >= startsAt) {
+      if (opensAt >= startsAt) {
         throw new BadRequestError(
           ErrorCodes.VALIDATION_FAILED,
-          'Tournament start time must be after registration close time.',
+          'Tournament start time must be after slot booking opens.',
         );
       }
     }

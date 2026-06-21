@@ -97,7 +97,8 @@ export function PreviewStep({ form, organizerChannel }: Props) {
         <Info label="Scoring" value={SCORING_LABEL[form.scoringModel]} />
         <Info label="Kill value" value={form.pointsPerKill} />
         <Info label="Prize pool" value={pool > 0 ? `INR ${(pool / 100).toLocaleString()}` : 'No prize'} />
-        <Info label="Registration" value={`${date(form.registrationOpenAt)} to ${date(form.registrationCloseAt)}`} />
+        <Info label="Slot booking opens" value={date(form.registrationOpenAt)} />
+        <Info label="Booking closes" value="When full or held manually" />
         <Info label="Tie-breakers" value={form.tiebreakers.map(labelFor).join(', ')} />
       </div>
     </div>

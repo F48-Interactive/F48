@@ -231,7 +231,6 @@ function tournamentPayload(form: TournamentForm) {
     prizePoolPaise: form.fundingType === 'free' ? undefined : rupeesToPaise(form.prizePoolRupees),
     scheduledStartAt: toIso(firstMatch?.scheduledAt ?? ''),
     registrationOpenAt: toIso(form.registrationOpenAt),
-    registrationCloseAt: toIso(form.registrationCloseAt),
     checkInDurationMin: form.checkInDurationMin,
     disputeWindowHours: form.disputeWindowHours,
     rulesText: metadata(form),
@@ -272,7 +271,7 @@ function validate(form: TournamentForm, publish: boolean): string[] {
 
   if (publish) {
     if (!form.bannerUrl.trim()) errors.push('Tournament banner URL is required before publishing.');
-    if (!form.registrationOpenAt || !form.registrationCloseAt) errors.push('Registration dates are required before publishing.');
+    if (!form.registrationOpenAt) errors.push('Slot booking open time is required before publishing.');
     if (!form.matchSchedule.every((row) => row.scheduledAt && row.map)) errors.push('Every match needs a time and map.');
     if (form.fundingType !== 'free' && leaderboardTotal(form) !== rupeesToPaise(form.prizePoolRupees)) {
       errors.push('Official leaderboard prize rows must sum exactly to the prize pool.');

@@ -24,7 +24,6 @@ interface Tournament {
   maxUnits: number | null;
   scheduledStartAt: string | null;
   registrationOpenAt: string | null;
-  registrationCloseAt: string | null;
   createdAt: string;
   organizer?: { displayName: string | null };
 }
@@ -39,8 +38,8 @@ const TABS = [
 
 const TRANSITIONS: Record<string, { action: string; label: string }[]> = {
   draft: [{ action: 'publish', label: 'Publish' }],
-  published: [{ action: 'open_registration', label: 'Open Registration' }],
-  registration_open: [{ action: 'close_registration', label: 'Close Registration' }],
+  published: [{ action: 'open_registration', label: 'Open Bookings' }],
+  registration_open: [{ action: 'close_registration', label: 'Hold Bookings' }],
   registration_closed: [{ action: 'start_check_in', label: 'Start Check-in' }],
   check_in: [{ action: 'go_live', label: 'Go Live' }],
   live: [{ action: 'publish_provisional_results', label: 'Publish Results' }],
@@ -211,7 +210,7 @@ export function TournamentWorkspace() {
           </div>
         )}
 
-        {activeTab === 'participants' && <EmptyTab icon={Users} title="Participants" desc="Registration data will appear here once registration opens." />}
+        {activeTab === 'participants' && <EmptyTab icon={Users} title="Participants" desc="Slot bookings will appear here once bookings open." />}
         {activeTab === 'matches' && <EmptyTab icon={Swords} title="Matches" desc="Match management will be available during the live phase." />}
         {activeTab === 'leaderboard' && <EmptyTab icon={TrophyIcon} title="Leaderboard" desc="Standings will appear after results are submitted." />}
         {activeTab === 'disputes' && <EmptyTab icon={AlertTriangle} title="Disputes" desc="No disputes filed for this tournament." />}
