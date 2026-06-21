@@ -1,5 +1,11 @@
 import { z } from 'zod';
 
+const optionalNonEmptyString = z.preprocess(
+  (value) =>
+    typeof value === 'string' && value.trim() === '' ? undefined : value,
+  z.string().min(1).optional(),
+);
+
 /**
  * Environment variable schema for the F48 backend.
  * Validated at startup. No raw process.env access outside config modules.
@@ -44,7 +50,7 @@ export const envSchema = z.object({
     .optional(),
 
   GAMES_KINBO_API_URL: z.string().url().default('https://api.gameskinbo.com'),
-  GAMES_KINBO_API_KEY: z.string().min(1),
+  GAMES_KINBO_API_KEY: optionalNonEmptyString,
 
   YOUTUBE_API_KEY: z.string().optional(),
 

@@ -19,7 +19,11 @@ export class GamesKinboProvider extends FreeFireLookupAdapter {
   constructor(env: EnvService) {
     super();
     this.apiUrl = env.gamesKinboApiUrl;
-    this.apiKey = env.gamesKinboApiKey;
+    const apiKey = env.gamesKinboApiKey;
+    if (!apiKey) {
+      throw new Error('GAMES_KINBO_API_KEY is required for GamesKinboProvider');
+    }
+    this.apiKey = apiKey;
   }
 
   async lookupByUid(uid: string): Promise<FreeFireLookupResult> {

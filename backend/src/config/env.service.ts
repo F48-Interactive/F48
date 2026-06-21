@@ -87,7 +87,7 @@ export class EnvService {
     return this.config.GAMES_KINBO_API_URL;
   }
 
-  get gamesKinboApiKey(): string {
+  get gamesKinboApiKey(): string | undefined {
     return this.config.GAMES_KINBO_API_KEY;
   }
 

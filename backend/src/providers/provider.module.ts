@@ -27,8 +27,10 @@ export class ProviderModule {
         {
           provide: FreeFireLookupAdapter,
           useFactory: (env: EnvService) => {
-            if (env.isDevelopment || env.isTest) {
-              ProviderModule.logger.log('Using MockFreeFireProvider');
+            if (env.isDevelopment || env.isTest || !env.gamesKinboApiKey) {
+              ProviderModule.logger.log(
+                'Using MockFreeFireProvider (GAMES_KINBO_API_KEY not set)',
+              );
               return new MockFreeFireProvider();
             }
             ProviderModule.logger.log('Using GamesKinboProvider');
