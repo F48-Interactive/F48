@@ -15,6 +15,7 @@ import { PrismaService } from '../../config/database.service.js';
 import { Prisma } from '../../generated/prisma/client.js';
 import { BadRequestError, ConflictError } from '../../lib/errors.js';
 import { ErrorCodes } from '../constants/error-codes.js';
+import { serializeForJson } from '../../lib/json.js';
 
 const IDEMPOTENCY_HEADER = 'x-idempotency-key';
 const IDEMPOTENCY_TTL_HOURS = 24;
@@ -191,6 +192,7 @@ function isUniqueConstraintError(error: unknown): boolean {
 }
 
 function stableStringify(value: unknown): string {
+  if (typeof value === 'bigint') return JSON.stringify(value.toString());
   if (value === null || typeof value !== 'object') {
     return JSON.stringify(value) ?? 'null';
   }
@@ -203,5 +205,7 @@ function stableStringify(value: unknown): string {
 }
 
 function toJson(value: unknown): Prisma.InputJsonValue {
-  return JSON.parse(JSON.stringify(value)) as Prisma.InputJsonValue;
+  return JSON.parse(
+    JSON.stringify(serializeForJson(value)),
+  ) as Prisma.InputJsonValue;
 }

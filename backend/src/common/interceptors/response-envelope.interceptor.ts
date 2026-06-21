@@ -7,6 +7,7 @@ import {
 import type { Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
 import type { ApiSuccessResponse } from '../../types/api.js';
+import { serializeForJson } from '../../lib/json.js';
 
 /**
  * Response Envelope Interceptor.
@@ -29,7 +30,7 @@ export class ResponseEnvelopeInterceptor<T>
           typeof data === 'object' &&
           'success' in data
         ) {
-          return data as unknown as ApiSuccessResponse<T>;
+          return serializeForJson(data) as ApiSuccessResponse<T>;
         }
 
         // Check if data includes a meta property (e.g., pagination)
@@ -41,14 +42,14 @@ export class ResponseEnvelopeInterceptor<T>
           const { meta, ...rest } = data as Record<string, unknown>;
           return {
             success: true as const,
-            data: rest as T,
-            meta: meta as ApiSuccessResponse<T>['meta'],
+            data: serializeForJson(rest) as T,
+            meta: serializeForJson(meta) as ApiSuccessResponse<T>['meta'],
           };
         }
 
         return {
           success: true as const,
-          data,
+          data: serializeForJson(data) as T,
         };
       }),
     );
