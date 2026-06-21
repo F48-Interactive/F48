@@ -55,6 +55,10 @@ export class TournamentService {
         'Connect a YouTube channel before creating tournaments.',
       );
     }
+    this.assertF48SponsorEligibility(
+      organizer.fundingEligibility,
+      data.fundingType,
+    );
 
     const tournament = await this.prisma.tournament.create({
       data: {
@@ -110,6 +114,10 @@ export class TournamentService {
       tournamentId,
     );
     this.authority.assertUpdateInput(tournament, data);
+    this.assertF48SponsorEligibility(
+      tournament.organizer.fundingEligibility,
+      data.fundingType,
+    );
 
     if (tournament.status !== 'draft') {
       throw new BadRequestError(
@@ -221,5 +229,19 @@ export class TournamentService {
       'Tournament transitioned',
     );
     return updated;
+  }
+
+  private assertF48SponsorEligibility(
+    fundingEligibility: string,
+    fundingType?: string,
+  ): void {
+    if (fundingType !== 'f48_sponsored') return;
+
+    if (fundingEligibility !== 'eligible') {
+      throw new ForbiddenError(
+        ErrorCodes.FORBIDDEN,
+        'F48-sponsored tournaments require F48 approval.',
+      );
+    }
   }
 }
