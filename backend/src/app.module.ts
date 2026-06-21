@@ -31,6 +31,12 @@ import { AuthModule } from './modules/auth/auth.module.js';
 import { PlayerModule } from './modules/player/player.module.js';
 import { OrganizerModule } from './modules/organizer/organizer.module.js';
 
+// Phase 2: Tournament & Funding
+import { TournamentModule } from './modules/tournament/tournament.module.js';
+import { FundingModule } from './modules/funding/funding.module.js';
+import { BannerModule } from './modules/banner/banner.module.js';
+import { MediaModule } from './modules/media/media.module.js';
+
 // Providers
 import { ProviderModule } from './providers/provider.module.js';
 
@@ -106,6 +112,12 @@ import { ProviderModule } from './providers/provider.module.js';
     AuthModule,
     PlayerModule,
     OrganizerModule,
+
+    // Phase 2: Tournament & Funding
+    TournamentModule,
+    FundingModule,
+    BannerModule,
+    MediaModule,
   ],
 
   providers: [

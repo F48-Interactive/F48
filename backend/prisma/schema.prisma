@@ -157,6 +157,7 @@ model Organizer {
   user                 User                        @relation(fields: [userId], references: [id])
   youtubeChannels      OrganizerYoutubeChannel[]
   verificationDecisions OrgVerificationDecision[]
+  tournaments          Tournament[]
 
   @@map("organizers")
 }
@@ -270,3 +271,352 @@ model IdempotencyKey {
   @@index([expiresAt])
   @@map("idempotency_keys")
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PHASE 2 ENUMS
+// ─────────────────────────────────────────────────────────────────────────────
+
+enum TournamentStatus {
+  draft
+  submitted
+  changes_required
+  approved
+  published
+  registration_open
+  registration_closed
+  check_in
+  live
+  results_pending
+  dispute_window
+  results_final
+  settlement
+  completed
+  canceled
+  voided
+  archived
+}
+
+enum TournamentMode {
+  solo
+  duo
+  squad
+}
+
+enum FundingType {
+  f48_sponsored
+  entry_fee
+}
+
+enum StructureType {
+  direct_final
+  qualifiers_to_final
+}
+
+enum ScoringModel {
+  combined
+  placement_only
+  kills_only
+}
+
+enum StageType {
+  qualifier
+  final
+}
+
+enum MatchStatus {
+  scheduled
+  check_in
+  room_released
+  live
+  awaiting_result
+  result_submitted
+  finalized
+  delayed
+  canceled
+  voided
+}
+
+enum FundingRequestStatus {
+  not_requested
+  draft
+  submitted
+  changes_required
+  partially_approved
+  approved
+  rejected
+  canceled
+  settled
+}
+
+enum BannerLinkType {
+  tournament
+  organizer
+  announcement
+  external
+}
+
+enum MediaPurpose {
+  tournament_banner
+  organizer_avatar
+  player_avatar
+  result_evidence
+  dispute_evidence
+  sponsor_logo
+  banner_image
+  deposit_proof
+}
+
+enum MediaAccessLevel {
+  public_access
+  authenticated
+  restricted
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PHASE 2: TOURNAMENT & FUNDING TABLES
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Core tournament entity (TOUR-001 to TOUR-004).
+model Tournament {
+  id                    String           @id @default(uuid()) @db.Uuid
+  organizerId           String           @map("organizer_id") @db.Uuid
+  title                 String           @db.VarChar(100)
+  description           String?
+  mode                  TournamentMode
+  fundingType           FundingType      @map("funding_type")
+  structureType         StructureType    @map("structure_type")
+  scoringModel          ScoringModel     @map("scoring_model")
+  status                TournamentStatus @default(draft)
+  gameMapId             String?          @map("game_map_id") @db.Uuid
+  bannerAssetId         String?          @map("banner_asset_id") @db.Uuid
+  maxUnits              Int              @map("max_units")
+  entryFeePaise         BigInt?          @map("entry_fee_paise")
+  prizePoolPaise        BigInt           @default(0) @map("prize_pool_paise")
+  scheduledStartAt      DateTime?        @map("scheduled_start_at") @db.Timestamptz
+  registrationOpenAt    DateTime?        @map("registration_open_at") @db.Timestamptz
+  registrationCloseAt   DateTime?        @map("registration_close_at") @db.Timestamptz
+  checkInDurationMin    Int?             @map("check_in_duration_min")
+  disputeWindowHours    Int              @default(24) @map("dispute_window_hours")
+  rulesText             String?          @map("rules_text")
+  activeConfigVersionId String?          @map("active_config_version_id") @db.Uuid
+  version               Int              @default(1) // Optimistic concurrency
+  isDeleted             Boolean          @default(false) @map("is_deleted")
+  createdAt             DateTime         @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt             DateTime         @updatedAt @map("updated_at") @db.Timestamptz
+
+  // Relations
+  organizer       Organizer               @relation(fields: [organizerId], references: [id])
+  stages          TournamentStage[]
+  rooms           TournamentRoom[]
+  matches         TournamentMatch[]
+  configVersions  TournamentConfigVersion[]
+  fundingRequest  FundingRequest?
+  gameMap         MapCatalog?              @relation(fields: [gameMapId], references: [id])
+
+  @@index([organizerId])
+  @@index([status])
+  @@index([scheduledStartAt])
+  @@map("tournaments")
+}
+
+/// Tournament stage (qualifier or final).
+model TournamentStage {
+  id                  String    @id @default(uuid()) @db.Uuid
+  tournamentId        String    @map("tournament_id") @db.Uuid
+  type                StageType
+  name                String    @db.VarChar(50)
+  stageOrder          Int       @map("stage_order")
+  advancementCount    Int?      @map("advancement_count")
+  pointsCarryForward  Boolean   @default(false) @map("points_carry_forward")
+  checkInDurationMin  Int?      @map("check_in_duration_min")
+  createdAt           DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  // Relations
+  tournament  Tournament        @relation(fields: [tournamentId], references: [id])
+  rooms       TournamentRoom[]
+  matches     TournamentMatch[]
+
+  @@unique([tournamentId, stageOrder])
+  @@map("tournament_stages")
+}
+
+/// Room within a stage (TOUR-001: 48 solo / 24 duo / 12 squad max).
+model TournamentRoom {
+  id              String   @id @default(uuid()) @db.Uuid
+  tournamentId    String   @map("tournament_id") @db.Uuid
+  stageId         String   @map("stage_id") @db.Uuid
+  name            String   @db.VarChar(50)
+  maxUnits        Int      @map("max_units")
+  roomOrder       Int      @map("room_order")
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  // Relations
+  tournament  Tournament        @relation(fields: [tournamentId], references: [id])
+  stage       TournamentStage   @relation(fields: [stageId], references: [id])
+  matches     TournamentMatch[]
+
+  @@unique([tournamentId, stageId, roomOrder])
+  @@map("tournament_rooms")
+}
+
+/// Match within a room (TOUR-003: every match → one room + one stage).
+model TournamentMatch {
+  id              String      @id @default(uuid()) @db.Uuid
+  tournamentId    String      @map("tournament_id") @db.Uuid
+  stageId         String      @map("stage_id") @db.Uuid
+  roomId          String      @map("room_id") @db.Uuid
+  matchNumber     Int         @map("match_number")
+  status          MatchStatus @default(scheduled)
+  scheduledAt     DateTime?   @map("scheduled_at") @db.Timestamptz
+  startedAt       DateTime?   @map("started_at") @db.Timestamptz
+  endedAt         DateTime?   @map("ended_at") @db.Timestamptz
+  createdAt       DateTime    @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt       DateTime    @updatedAt @map("updated_at") @db.Timestamptz
+
+  // Relations
+  tournament  Tournament      @relation(fields: [tournamentId], references: [id])
+  stage       TournamentStage @relation(fields: [stageId], references: [id])
+  room        TournamentRoom  @relation(fields: [roomId], references: [id])
+
+  @@unique([tournamentId, matchNumber])
+  @@index([status])
+  @@map("tournament_matches")
+}
+
+/// Versioned scoring/prize/tiebreak config (DATA-005, SCORE-009).
+model TournamentConfigVersion {
+  id              String       @id @default(uuid()) @db.Uuid
+  tournamentId    String       @map("tournament_id") @db.Uuid
+  versionNumber   Int          @map("version_number")
+  scoringModel    ScoringModel @map("scoring_model")
+  killMultiplier  Decimal      @default(1) @map("kill_multiplier") @db.Decimal(5, 2)
+  isLocked        Boolean      @default(false) @map("is_locked")
+  lockedAt        DateTime?    @map("locked_at") @db.Timestamptz
+  createdAt       DateTime     @default(now()) @map("created_at") @db.Timestamptz
+
+  // Relations
+  tournament      Tournament       @relation(fields: [tournamentId], references: [id])
+  placementPoints PlacementPoints[]
+  prizeRules      PrizeRule[]
+  tiebreakRules   TiebreakRule[]
+
+  @@unique([tournamentId, versionNumber])
+  @@map("tournament_config_versions")
+}
+
+/// Placement position → points (SCORE-001/002).
+model PlacementPoints {
+  id                String @id @default(uuid()) @db.Uuid
+  configVersionId   String @map("config_version_id") @db.Uuid
+  position          Int
+  points            Decimal @db.Decimal(8, 2)
+
+  configVersion TournamentConfigVersion @relation(fields: [configVersionId], references: [id])
+
+  @@unique([configVersionId, position])
+  @@map("placement_points")
+}
+
+/// Prize distribution rule per rank (PRIZE-001/002/003).
+model PrizeRule {
+  id                String @id @default(uuid()) @db.Uuid
+  configVersionId   String @map("config_version_id") @db.Uuid
+  rankStart         Int    @map("rank_start")
+  rankEnd           Int    @map("rank_end")
+  amountPaise       BigInt @map("amount_paise")
+
+  configVersion TournamentConfigVersion @relation(fields: [configVersionId], references: [id])
+
+  @@unique([configVersionId, rankStart])
+  @@map("prize_rules")
+}
+
+/// Ordered tiebreak fields (SCORE-010).
+model TiebreakRule {
+  id                String @id @default(uuid()) @db.Uuid
+  configVersionId   String @map("config_version_id") @db.Uuid
+  priority          Int
+  field             String @db.VarChar(50)
+
+  configVersion TournamentConfigVersion @relation(fields: [configVersionId], references: [id])
+
+  @@unique([configVersionId, priority])
+  @@map("tiebreak_rules")
+}
+
+/// Funding request lifecycle (9 states).
+model FundingRequest {
+  id              String               @id @default(uuid()) @db.Uuid
+  tournamentId    String               @unique @map("tournament_id") @db.Uuid
+  requestedPaise  BigInt               @map("requested_paise")
+  approvedPaise   BigInt?              @map("approved_paise")
+  status          FundingRequestStatus @default(not_requested)
+  reason          String?
+  adminNotes      String?              @map("admin_notes")
+  depositProofId  String?              @map("deposit_proof_id") @db.Uuid
+  reviewedBy      String?              @map("reviewed_by") @db.Uuid
+  reviewedAt      DateTime?            @map("reviewed_at") @db.Timestamptz
+  createdAt       DateTime             @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt       DateTime             @updatedAt @map("updated_at") @db.Timestamptz
+
+  // Relations
+  tournament Tournament @relation(fields: [tournamentId], references: [id])
+
+  @@index([status])
+  @@map("funding_requests")
+}
+
+/// Hero carousel banners.
+model Banner {
+  id           String         @id @default(uuid()) @db.Uuid
+  title        String         @db.VarChar(100)
+  subtitle     String?        @db.VarChar(200)
+  imageAssetId String         @map("image_asset_id") @db.Uuid
+  linkType     BannerLinkType @map("link_type")
+  linkId       String?        @map("link_id")
+  linkUrl      String?        @map("link_url")
+  priority     Int            @default(0)
+  isActive     Boolean        @default(true) @map("is_active")
+  startsAt     DateTime?      @map("starts_at") @db.Timestamptz
+  endsAt       DateTime?      @map("ends_at") @db.Timestamptz
+  createdAt    DateTime       @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt    DateTime       @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@index([isActive, priority])
+  @@map("banners")
+}
+
+/// Game map catalog.
+model MapCatalog {
+  id          String       @id @default(uuid()) @db.Uuid
+  name        String       @db.VarChar(50)
+  gameCode    String       @map("game_code") @db.VarChar(20)
+  imageUrl    String?      @map("image_url")
+  isActive    Boolean      @default(true) @map("is_active")
+  createdAt   DateTime     @default(now()) @map("created_at") @db.Timestamptz
+
+  tournaments Tournament[]
+
+  @@map("map_catalog")
+}
+
+/// Uploaded media asset tracking (MEDIA-001/002).
+model MediaAsset {
+  id           String           @id @default(uuid()) @db.Uuid
+  uploaderId   String           @map("uploader_id") @db.Uuid
+  purpose      MediaPurpose
+  accessLevel  MediaAccessLevel @default(public_access) @map("access_level")
+  cloudinaryId String           @map("cloudinary_id")
+  url          String
+  secureUrl    String           @map("secure_url")
+  format       String           @db.VarChar(10)
+  width        Int?
+  height       Int?
+  sizeBytes    Int              @map("size_bytes")
+  createdAt    DateTime         @default(now()) @map("created_at") @db.Timestamptz
+
+  @@index([uploaderId])
+  @@index([purpose])
+  @@map("media_assets")
+}
+

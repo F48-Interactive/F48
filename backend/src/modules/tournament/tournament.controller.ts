@@ -1,0 +1,139 @@
+/**
+ * TournamentController — REST endpoints for tournament CRUD and config.
+ * TOUR-001 to TOUR-004.
+ */
+import {
+  Controller, Post, Get, Patch, Body, Param, Query, UsePipes,
+} from '@nestjs/common';
+import { ApiTags, ApiOperation } from '@nestjs/swagger';
+import { TournamentService } from './tournament.service.js';
+import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe.js';
+import { CurrentUser, type RequestUser } from '../../common/decorators/current-user.decorator.js';
+import { Public, Roles } from '../../common/decorators/index.js';
+import { ForbiddenError } from '../../lib/errors.js';
+import { ErrorCodes } from '../../common/constants/error-codes.js';
+import {
+  CreateTournamentSchema,
+  UpdateTournamentSchema,
+  TransitionTournamentSchema,
+  ScoringConfigSchema,
+  PrizeConfigSchema,
+  TiebreakConfigSchema,
+  TournamentListSchema,
+} from './dto/tournament.dto.js';
+
+@ApiTags('Tournaments')
+@Controller('tournaments')
+export class TournamentController {
+  constructor(private readonly tournamentService: TournamentService) {}
+
+  private assertActive(user: RequestUser): void {
+    if (user.status === 'suspended' || user.status === 'banned') {
+      throw new ForbiddenError(ErrorCodes.FORBIDDEN, 'Account restricted.');
+    }
+  }
+
+  @Post()
+  @ApiOperation({ summary: 'Create tournament draft' })
+  @UsePipes(new ZodValidationPipe(CreateTournamentSchema))
+  async create(@CurrentUser() user: RequestUser, @Body() body: any) {
+    this.assertActive(user);
+    return this.tournamentService.create(user, body);
+  }
+
+  @Get()
+  @Public()
+  @ApiOperation({ summary: 'List tournaments (public)' })
+  async list(
+    @Query('status') status?: string,
+    @Query('mode') mode?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    const parsed = TournamentListSchema.parse({ status, mode, page, limit });
+    return this.tournamentService.list(parsed);
+  }
+
+  @Get('my')
+  @ApiOperation({ summary: 'List my tournaments (organizer)' })
+  async listMine(
+    @CurrentUser() user: RequestUser,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.tournamentService.listByOrganizer(
+      user.id,
+      Math.max(1, parseInt(page ?? '1', 10) || 1),
+      Math.min(100, Math.max(1, parseInt(limit ?? '20', 10) || 20)),
+    );
+  }
+
+  @Get(':id')
+  @Public()
+  @ApiOperation({ summary: 'Get tournament details' })
+  async getById(@Param('id') id: string) {
+    return this.tournamentService.getById(id);
+  }
+
+  @Patch(':id')
+  @ApiOperation({ summary: 'Update tournament (draft/changes_required)' })
+  @UsePipes(new ZodValidationPipe(UpdateTournamentSchema))
+  async update(
+    @CurrentUser() user: RequestUser,
+    @Param('id') id: string,
+    @Body() body: any,
+  ) {
+    this.assertActive(user);
+    return this.tournamentService.update(user, id, body);
+  }
+
+  @Post(':id/transition')
+  @ApiOperation({ summary: 'Transition tournament status' })
+  @UsePipes(new ZodValidationPipe(TransitionTournamentSchema))
+  async transition(
+    @CurrentUser() user: RequestUser,
+    @Param('id') id: string,
+    @Body() body: { action: string; reason?: string },
+  ) {
+    this.assertActive(user);
+    return this.tournamentService.transition(user, id, body.action, body.reason);
+  }
+
+  @Post(':id/scoring-config')
+  @ApiOperation({ summary: 'Set scoring config (creates new version)' })
+  @UsePipes(new ZodValidationPipe(ScoringConfigSchema))
+  async setScoringConfig(
+    @CurrentUser() user: RequestUser,
+    @Param('id') id: string,
+    @Body() body: any,
+  ) {
+    this.assertActive(user);
+    return this.tournamentService.setScoringConfig(user, id, body);
+  }
+
+  @Post(':id/config/:configVersionId/prizes')
+  @ApiOperation({ summary: 'Set prize rules for config version' })
+  @UsePipes(new ZodValidationPipe(PrizeConfigSchema))
+  async setPrizeConfig(
+    @CurrentUser() user: RequestUser,
+    @Param('id') id: string,
+    @Param('configVersionId') configVersionId: string,
+    @Body() body: any,
+  ) {
+    this.assertActive(user);
+    return this.tournamentService.setPrizeConfig(user, id, configVersionId, body);
+  }
+
+  @Post(':id/config/:configVersionId/tiebreaks')
+  @ApiOperation({ summary: 'Set tiebreak rules for config version' })
+  @UsePipes(new ZodValidationPipe(TiebreakConfigSchema))
+  async setTiebreakConfig(
+    @CurrentUser() user: RequestUser,
+    @Param('id') id: string,
+    @Param('configVersionId') configVersionId: string,
+    @Body() body: any,
+  ) {
+    this.assertActive(user);
+    return this.tournamentService.setTiebreakConfig(user, id, configVersionId, body);
+  }
+}
