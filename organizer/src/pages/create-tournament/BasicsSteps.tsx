@@ -88,15 +88,16 @@ export function ModeStep({ form, setForm }: Props) {
         {modes.map((mode) => (
           <button key={mode} type="button" className={`choice-card ${form.mode === mode ? 'choice-selected' : ''}`} onClick={() => setForm(updateMode(form, mode))}>
             <span className="choice-title">{mode.toUpperCase()}</span>
-            <span className="choice-desc">{TEAM_SIZE[mode]} per registration, {MODE_CAPACITY[mode]} {MODE_LABEL[mode]} per room.</span>
+            <span className="choice-desc">{slotCopy(mode)} {MODE_CAPACITY[mode]} {MODE_LABEL[mode]} per room.</span>
           </button>
         ))}
       </div>
       <div className="input-group">
-        <label className="input-label" htmlFor="capacity">Total registration capacity ({MODE_LABEL[form.mode]})</label>
+        <label className="input-label" htmlFor="capacity">Total slots ({MODE_LABEL[form.mode]})</label>
         <input id="capacity" className="input" type="number" min="2" max={cap * 4} value={form.maxUnits} onChange={(e) => setForm(refreshSchedule({ ...form, maxUnits: Number(e.target.value) }))} />
       </div>
       <div className="info-grid">
+        <Info label="Slot booking" value={slotBookingInfo(form.mode)} />
         <Info label="Room capacity" value={`${cap} ${MODE_LABEL[form.mode]}`} />
         <Info label="Calculated rooms" value={`${roomCount(form)} room${roomCount(form) === 1 ? '' : 's'}`} />
       </div>
@@ -141,4 +142,14 @@ function Select({ label, value, onChange, options }: { label: string; value: str
 
 function Info({ label, value }: { label: string; value: string }) {
   return <div className="review-item"><span className="review-label">{label}</span><span className="review-value">{value}</span></div>;
+}
+
+function slotCopy(mode: TournamentMode): string {
+  if (mode === 'solo') return 'Each player books one slot.';
+  return `Team leader books one ${TEAM_SIZE[mode]}-player team slot.`;
+}
+
+function slotBookingInfo(mode: TournamentMode): string {
+  if (mode === 'solo') return 'Each player books their own slot';
+  return `Only the team leader books for all ${TEAM_SIZE[mode]} players`;
 }

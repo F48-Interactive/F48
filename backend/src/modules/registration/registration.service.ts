@@ -1,5 +1,5 @@
 /**
- * RegistrationService — Solo/team registration, check-in, withdrawal.
+ * RegistrationService — Solo/team slot booking, check-in, withdrawal.
  * REG-001 to REG-011.
  */
 import { Injectable, Logger } from '@nestjs/common';
@@ -73,7 +73,7 @@ export class RegistrationService {
       },
     });
 
-    this.logger.log({ tournamentId, playerId: player.id }, 'Solo registration');
+    this.logger.log({ tournamentId, playerId: player.id }, 'Solo slot booking');
     return registration;
   }
 
@@ -133,7 +133,7 @@ export class RegistrationService {
 
     this.logger.log(
       { tournamentId, teamSize: allPlayerIds.length },
-      'Team registration',
+      'Team slot booking',
     );
     return registration;
   }

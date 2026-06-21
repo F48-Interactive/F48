@@ -3,6 +3,7 @@ import {
   MODE_CAPACITY,
   REQUIRED_TIEBREAKERS,
   SQUAD_BALANCED,
+  TEAM_SIZE,
 } from './constants';
 import type { MatchScheduleRow, TournamentForm, TournamentMode } from './types';
 
@@ -41,7 +42,6 @@ export function defaultForm(): TournamentForm {
     mobileOnly: true,
     regionRestriction: '',
     minimumAccountLevel: '',
-    rosterCompleteRequired: true,
     lateRegistrationAllowed: false,
     checkInDurationMin: 20,
     roomReleaseMode: 'manual',
@@ -167,7 +167,10 @@ export function metadata(form: TournamentForm): string {
       mobileOnly: form.mobileOnly,
       regionRestriction: form.regionRestriction || null,
       minimumAccountLevel: form.minimumAccountLevel || null,
-      rosterCompleteRequired: form.rosterCompleteRequired,
+      slotBookedBy: form.mode === 'solo' ? 'player' : 'team_leader',
+      slotUnit: form.mode === 'solo' ? 'player' : 'team',
+      teamSize: TEAM_SIZE[form.mode],
+      fullTeamRequiredAtSlotBooking: form.mode !== 'solo',
       lateRegistrationAllowed: form.lateRegistrationAllowed,
     },
     schedule: {

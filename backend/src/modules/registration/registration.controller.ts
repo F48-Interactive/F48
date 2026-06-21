@@ -28,7 +28,7 @@ export class RegistrationController {
 
   @Post('solo')
   @Idempotent()
-  @ApiOperation({ summary: 'Register as solo player' })
+  @ApiOperation({ summary: 'Book a solo player slot' })
   async registerSolo(
     @CurrentUser() user: RequestUser,
     @Body(new ZodValidationPipe(RegisterSoloSchema))
@@ -39,7 +39,7 @@ export class RegistrationController {
 
   @Post('team')
   @Idempotent()
-  @ApiOperation({ summary: 'Register as team' })
+  @ApiOperation({ summary: 'Book a team slot as captain' })
   async registerTeam(
     @CurrentUser() user: RequestUser,
     @Body(new ZodValidationPipe(RegisterTeamSchema))

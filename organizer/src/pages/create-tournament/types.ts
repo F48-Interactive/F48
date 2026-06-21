@@ -48,7 +48,6 @@ export interface TournamentForm {
   mobileOnly: boolean;
   regionRestriction: string;
   minimumAccountLevel: string;
-  rosterCompleteRequired: boolean;
   lateRegistrationAllowed: boolean;
   checkInDurationMin: number;
   roomReleaseMode: 'manual' | 'scheduled';

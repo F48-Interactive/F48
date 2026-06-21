@@ -58,7 +58,7 @@ export class RegistrationAuthorityService {
     if (tournament.mode !== 'solo') {
       throw new BadRequestError(
         ErrorCodes.VALIDATION_FAILED,
-        'Solo registration is only for solo tournaments.',
+        'Solo slot booking is only for solo tournaments.',
       );
     }
   }
@@ -67,7 +67,7 @@ export class RegistrationAuthorityService {
     if (tournament.mode === 'solo') {
       throw new BadRequestError(
         ErrorCodes.VALIDATION_FAILED,
-        'Use solo registration for solo tournaments.',
+        'Use solo slot booking for solo tournaments.',
       );
     }
   }
@@ -85,7 +85,7 @@ export class RegistrationAuthorityService {
     if (playerIds.length !== expected) {
       throw new BadRequestError(
         ErrorCodes.ROSTER_INCOMPLETE,
-        `${mode} registration requires exactly ${expected} players.`,
+        `${mode} slot booking requires exactly ${expected} players.`,
       );
     }
   }
