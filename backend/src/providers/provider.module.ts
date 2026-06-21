@@ -9,6 +9,7 @@ import { MockFreeFireProvider } from './games-kinbo/games-kinbo.mock.js';
 // YouTube
 import { YouTubeLookupAdapter } from './youtube/youtube.adapter.js';
 import { MockYouTubeProvider } from './youtube/youtube.mock.js';
+import { YouTubeDataProvider } from './youtube/youtube.provider.js';
 
 /**
  * Provider Module (ARCH-012).
@@ -47,8 +48,8 @@ export class ProviderModule {
               );
               return new MockYouTubeProvider();
             }
-            ProviderModule.logger.log('Using MockYouTubeProvider');
-            return new MockYouTubeProvider();
+            ProviderModule.logger.log('Using YouTubeDataProvider');
+            return new YouTubeDataProvider(env);
           },
           inject: [EnvService],
         },

@@ -43,7 +43,7 @@ export type UpdateOrganizerInput = z.infer<typeof UpdateOrganizerSchema>;
 // Submit YouTube channel URL
 // ─────────────────────────────────────────────────────────────────────────────
 const YOUTUBE_URL_REGEX =
-  /^https?:\/\/(www\.)?youtube\.com\/(channel\/|@|c\/)/i;
+  /^https?:\/\/(www\.)?youtube\.com\/(channel\/|@|c\/|user\/)/i;
 
 export const SubmitYoutubeSchema = z.object({
   channelUrl: z
