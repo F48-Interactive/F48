@@ -38,6 +38,32 @@ npm run lint
 npm run preview
 ```
 
+## Railway Deployment
+
+Create a new Railway service from this repo and set the service root directory
+to `organizer`.
+
+Use Docker as the builder. The included `Dockerfile` builds the Vite app and
+serves `dist/` with nginx using Railway's `$PORT`.
+
+Required organizer service variables:
+
+```text
+VITE_API_URL=https://your-backend-domain.up.railway.app/api/v1
+VITE_FIREBASE_API_KEY=...
+VITE_FIREBASE_AUTH_DOMAIN=f48-int.firebaseapp.com
+VITE_FIREBASE_PROJECT_ID=f48-int
+VITE_FIREBASE_STORAGE_BUCKET=f48-int.firebasestorage.app
+VITE_FIREBASE_MESSAGING_SENDER_ID=918066351105
+VITE_FIREBASE_APP_ID=...
+VITE_FIREBASE_MEASUREMENT_ID=...
+```
+
+After Railway gives the organizer domain, add it to:
+
+- Backend `CORS_ORIGINS`
+- Firebase Authentication authorized domains
+
 ## Current Product Flow
 
 Google sign-in -> backend session cookie -> organizer profile -> YouTube channel -> dashboard -> create tournament draft -> configure/publish from workspace.

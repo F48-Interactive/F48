@@ -158,7 +158,7 @@ export class AuthController {
     reply.setCookie(SESSION_COOKIE, cookie, {
       httpOnly: true,
       secure: !this.env.isDevelopment,
-      sameSite: 'strict',
+      sameSite: this.env.isProduction ? 'none' : 'lax',
       path: '/',
       maxAge: SESSION_MAX_AGE_SECONDS,
     });
@@ -169,7 +169,7 @@ export class AuthController {
     reply.clearCookie(SESSION_COOKIE, {
       httpOnly: true,
       secure: !this.env.isDevelopment,
-      sameSite: 'strict',
+      sameSite: this.env.isProduction ? 'none' : 'lax',
       path: '/',
     });
   }
