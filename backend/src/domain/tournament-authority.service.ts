@@ -10,10 +10,13 @@ import type {
   TiebreakConfigInput,
   UpdateTournamentInput,
 } from '../modules/tournament/dto/tournament.dto.js';
+import { assertFundingShape } from './tournament-funding-policy.js';
 import {
-  assertFundingShape,
-  requiresPrizePool,
-} from './tournament-funding-policy.js';
+  assertPrizeConfig as assertPrizeConfigPolicy,
+  assertPublishableConfig as assertPublishableConfigPolicy,
+  assertScoringConfig as assertScoringConfigPolicy,
+  assertTiebreakConfig as assertTiebreakConfigPolicy,
+} from './tournament-config-policy.js';
 
 type TournamentMode = 'solo' | 'duo' | 'squad';
 
@@ -40,12 +43,6 @@ const PUBLIC_TOURNAMENT_STATUSES: readonly string[] = [
   'results_final',
   'completed',
 ];
-
-const REQUIRED_TIEBREAK_ORDER = [
-  'total_booyahs',
-  'total_kills',
-  'final_match_placement',
-] as const;
 
 @Injectable()
 export class TournamentAuthorityService {
@@ -106,169 +103,18 @@ export class TournamentAuthorityService {
     data: ScoringConfigInput,
   ): void {
     this.assertModeCapacity(tournament.mode, tournament.maxUnits);
-
-    if (
-      data.scoringModel === 'placement_only' &&
-      decimalToNumber(data.killMultiplier) !== 0
-    ) {
-      throw new BadRequestError(
-        ErrorCodes.VALIDATION_FAILED,
-        'Placement-only scoring must use a 0.00 kill multiplier.',
-      );
-    }
-
-    if (
-      data.scoringModel !== 'placement_only' &&
-      decimalToNumber(data.killMultiplier) <= 0
-    ) {
-      throw new BadRequestError(
-        ErrorCodes.VALIDATION_FAILED,
-        'Kill multiplier must be greater than zero.',
-      );
-    }
-
-    const expectedPositions = new Set<number>();
-    for (let position = 1; position <= tournament.maxUnits; position += 1) {
-      expectedPositions.add(position);
-    }
-
-    const seen = new Set<number>();
-    for (const entry of data.placementPoints) {
-      if (seen.has(entry.position)) {
-        throw new BadRequestError(
-          ErrorCodes.VALIDATION_FAILED,
-          'Duplicate placement position.',
-        );
-      }
-      seen.add(entry.position);
-      expectedPositions.delete(entry.position);
-    }
-
-    if (expectedPositions.size > 0 || seen.size !== tournament.maxUnits) {
-      throw new BadRequestError(
-        ErrorCodes.INVALID_PLACEMENT,
-        `Placement table must include every position from 1 to ${tournament.maxUnits}.`,
-      );
-    }
-
-    const sorted = [...data.placementPoints].sort(
-      (a, b) => a.position - b.position,
-    );
-    let previousPoints = Number.POSITIVE_INFINITY;
-    for (const entry of sorted) {
-      const points = decimalToNumber(entry.points);
-      if (points > previousPoints) {
-        throw new BadRequestError(
-          ErrorCodes.VALIDATION_FAILED,
-          'Placement points must be non-increasing by position.',
-        );
-      }
-      previousPoints = points;
-    }
-
-    const finalRow = sorted[sorted.length - 1];
-    if (!finalRow || decimalToNumber(finalRow.points) !== 0) {
-      throw new BadRequestError(
-        ErrorCodes.VALIDATION_FAILED,
-        `Position ${tournament.maxUnits} must be locked to 0 placement points.`,
-      );
-    }
+    assertScoringConfigPolicy(tournament, data);
   }
 
   assertPrizeConfig(
     tournament: { prizePoolPaise: bigint; maxUnits: number },
     data: PrizeConfigInput,
   ): void {
-    if (tournament.prizePoolPaise <= 0n) {
-      throw new BadRequestError(
-        ErrorCodes.PRIZE_POOL_MISMATCH,
-        'Prize pool must be funded before prize rules are configured.',
-      );
-    }
-
-    const seenRanks = new Set<number>();
-    let sum = 0n;
-
-    for (const rule of data.rules) {
-      if (rule.rankStart !== rule.rankEnd) {
-        throw new BadRequestError(
-          ErrorCodes.VALIDATION_FAILED,
-          'Prize rules must target exact final ranks; ranges are not allowed.',
-        );
-      }
-      if (rule.rankStart > tournament.maxUnits) {
-        throw new BadRequestError(
-          ErrorCodes.VALIDATION_FAILED,
-          'Prize rank exceeds tournament capacity.',
-        );
-      }
-      if (rule.amountPaise <= 0) {
-        throw new BadRequestError(
-          ErrorCodes.INVALID_AMOUNT,
-          'Prize amounts must be positive.',
-        );
-      }
-      if (seenRanks.has(rule.rankStart)) {
-        throw new BadRequestError(
-          ErrorCodes.DUPLICATE_RESOURCE,
-          'Duplicate prize rank.',
-        );
-      }
-
-      seenRanks.add(rule.rankStart);
-      sum += BigInt(rule.amountPaise);
-    }
-
-    if (sum !== tournament.prizePoolPaise) {
-      throw new BadRequestError(
-        ErrorCodes.PRIZE_POOL_MISMATCH,
-        'Prize rules must sum exactly to the tournament prize pool.',
-        {
-          expectedPaise: tournament.prizePoolPaise.toString(),
-          actualPaise: sum.toString(),
-        },
-      );
-    }
+    assertPrizeConfigPolicy(tournament, data);
   }
 
   assertTiebreakConfig(data: TiebreakConfigInput): void {
-    const priorities = new Set<number>();
-    const fields = new Set<string>();
-
-    for (const rule of data.rules) {
-      if (priorities.has(rule.priority)) {
-        throw new BadRequestError(
-          ErrorCodes.DUPLICATE_RESOURCE,
-          'Duplicate tiebreak priority.',
-        );
-      }
-      if (fields.has(rule.field)) {
-        throw new BadRequestError(
-          ErrorCodes.DUPLICATE_RESOURCE,
-          'Duplicate tiebreak field.',
-        );
-      }
-      priorities.add(rule.priority);
-      fields.add(rule.field);
-    }
-
-    for (let priority = 1; priority <= data.rules.length; priority += 1) {
-      if (!priorities.has(priority)) {
-        throw new BadRequestError(
-          ErrorCodes.VALIDATION_FAILED,
-          'Tiebreak priorities must be contiguous from 1.',
-        );
-      }
-    }
-
-    for (const field of REQUIRED_TIEBREAK_ORDER) {
-      if (!fields.has(field)) {
-        throw new BadRequestError(
-          ErrorCodes.VALIDATION_FAILED,
-          `Tiebreak config must include ${field}.`,
-        );
-      }
-    }
+    assertTiebreakConfigPolicy(data);
   }
 
   async assertTransitionPrerequisites(
@@ -278,12 +124,18 @@ export class TournamentAuthorityService {
     if (action === 'publish' || action === 'open_registration') {
       const tournament = await this.prisma.tournament.findUnique({
         where: { id: tournamentId },
+        select: {
+          activeConfigVersionId: true,
+          fundingType: true,
+          prizePoolPaise: true,
+          maxUnits: true,
+        },
       });
 
-      if (!tournament?.activeConfigVersionId) {
+      if (!tournament) {
         throw new BadRequestError(
           ErrorCodes.VALIDATION_FAILED,
-          'Active scoring config is required before publishing.',
+          'Tournament must exist before publishing.',
         );
       }
 
@@ -294,15 +146,21 @@ export class TournamentAuthorityService {
         );
       }
 
-      if (
-        requiresPrizePool(tournament.fundingType) &&
-        tournament.prizePoolPaise <= 0n
-      ) {
-        throw new BadRequestError(
-          ErrorCodes.PRIZE_POOL_MISMATCH,
-          'Prize pool must be set before this tournament can open.',
-        );
-      }
+      const config = tournament.activeConfigVersionId
+        ? await this.prisma.tournamentConfigVersion.findFirst({
+            where: {
+              id: tournament.activeConfigVersionId,
+              tournamentId,
+            },
+            select: {
+              placementPoints: { select: { id: true } },
+              prizeRules: { select: { amountPaise: true } },
+              tiebreakRules: { select: { priority: true, field: true } },
+            },
+          })
+        : null;
+
+      assertPublishableConfigPolicy(tournament, config);
     }
 
     if (action === 'finalize_results') {
@@ -411,8 +269,4 @@ export class TournamentAuthorityService {
       }
     }
   }
-}
-
-function decimalToNumber(value: string): number {
-  return Number.parseFloat(value);
 }
