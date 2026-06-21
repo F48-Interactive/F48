@@ -26,6 +26,8 @@ export const MODE_CAPACITY: Record<TournamentMode, number> = {
   squad: 12,
 };
 
+const MAX_QUALIFIER_ROOMS = 4;
+
 export const MODE_ROSTER_SIZE: Record<TournamentMode, number> = {
   solo: 1,
   duo: 2,
@@ -57,7 +59,8 @@ export class TournamentAuthorityService {
   }
 
   assertCreateInput(data: CreateTournamentInput): void {
-    this.assertModeCapacity(data.mode, data.maxUnits);
+    this.assertModeCapacity(data.mode, data.structureType, data.maxUnits);
+    this.assertStageConfig(data);
     assertFundingShape(
       data.fundingType,
       data.entryFeePaise,
@@ -73,6 +76,7 @@ export class TournamentAuthorityService {
   assertUpdateInput(
     existing: {
       mode: string;
+      structureType: string;
       maxUnits: number;
       fundingType: string;
       entryFeePaise: bigint | null;
@@ -81,6 +85,7 @@ export class TournamentAuthorityService {
     data: UpdateTournamentInput,
   ): void {
     const nextMode = data.mode ?? existing.mode;
+    const nextStructureType = data.structureType ?? existing.structureType;
     const nextMaxUnits = data.maxUnits ?? existing.maxUnits;
     const nextFundingType = data.fundingType ?? existing.fundingType;
     const nextEntryFee =
@@ -89,7 +94,7 @@ export class TournamentAuthorityService {
     const nextPrizePool =
       data.prizePoolPaise ?? Number(existing.prizePoolPaise);
 
-    this.assertModeCapacity(nextMode, nextMaxUnits);
+    this.assertModeCapacity(nextMode, nextStructureType, nextMaxUnits);
     assertFundingShape(nextFundingType, nextEntryFee, nextPrizePool);
     this.assertScheduleShape(
       data.registrationOpenAt,
@@ -102,15 +107,23 @@ export class TournamentAuthorityService {
     tournament: { mode: string; maxUnits: number },
     data: ScoringConfigInput,
   ): void {
-    this.assertModeCapacity(tournament.mode, tournament.maxUnits);
-    assertScoringConfigPolicy(tournament, data);
+    assertScoringConfigPolicy(
+      { placementSlots: this.modeCapacity(tournament.mode) },
+      data,
+    );
   }
 
   assertPrizeConfig(
-    tournament: { prizePoolPaise: bigint; maxUnits: number },
+    tournament: { mode: string; prizePoolPaise: bigint; maxUnits: number },
     data: PrizeConfigInput,
   ): void {
-    assertPrizeConfigPolicy(tournament, data);
+    assertPrizeConfigPolicy(
+      {
+        prizePoolPaise: tournament.prizePoolPaise,
+        prizeSlots: this.modeCapacity(tournament.mode),
+      },
+      data,
+    );
   }
 
   assertTiebreakConfig(data: TiebreakConfigInput): void {
@@ -126,9 +139,14 @@ export class TournamentAuthorityService {
         where: { id: tournamentId },
         select: {
           activeConfigVersionId: true,
+          bannerAssetId: true,
           fundingType: true,
+          mode: true,
           prizePoolPaise: true,
           maxUnits: true,
+          scheduledStartAt: true,
+          registrationOpenAt: true,
+          registrationCloseAt: true,
         },
       });
 
@@ -146,6 +164,24 @@ export class TournamentAuthorityService {
         );
       }
 
+      if (!tournament.bannerAssetId) {
+        throw new BadRequestError(
+          ErrorCodes.VALIDATION_FAILED,
+          'Tournament banner is required before publishing.',
+        );
+      }
+
+      if (
+        !tournament.registrationOpenAt ||
+        !tournament.registrationCloseAt ||
+        !tournament.scheduledStartAt
+      ) {
+        throw new BadRequestError(
+          ErrorCodes.VALIDATION_FAILED,
+          'Registration and match schedule dates are required before publishing.',
+        );
+      }
+
       const config = tournament.activeConfigVersionId
         ? await this.prisma.tournamentConfigVersion.findFirst({
             where: {
@@ -160,7 +196,14 @@ export class TournamentAuthorityService {
           })
         : null;
 
-      assertPublishableConfigPolicy(tournament, config);
+      assertPublishableConfigPolicy(
+        {
+          fundingType: tournament.fundingType,
+          prizePoolPaise: tournament.prizePoolPaise,
+          placementSlots: this.modeCapacity(tournament.mode),
+        },
+        config,
+      );
     }
 
     if (action === 'finalize_results') {
@@ -232,12 +275,74 @@ export class TournamentAuthorityService {
     return mode;
   }
 
-  private assertModeCapacity(mode: string, maxUnits: number): void {
-    const expected = this.modeCapacity(mode);
-    if (maxUnits !== expected) {
+  private assertModeCapacity(
+    mode: string,
+    structureType: string,
+    maxUnits: number,
+  ): void {
+    const roomCapacity = this.modeCapacity(mode);
+    const maxCapacity = roomCapacity * MAX_QUALIFIER_ROOMS;
+
+    if (structureType === 'direct_final' && maxUnits > roomCapacity) {
       throw new BadRequestError(
         ErrorCodes.CAPACITY_EXCEEDED,
-        `${mode} tournaments must use exactly ${expected} units.`,
+        `${mode} direct finals cannot exceed ${roomCapacity} registrations.`,
+      );
+    }
+
+    if (
+      structureType === 'qualifiers_to_final' &&
+      (maxUnits <= roomCapacity || maxUnits > maxCapacity)
+    ) {
+      throw new BadRequestError(
+        ErrorCodes.CAPACITY_EXCEEDED,
+        `${mode} qualifier tournaments must use ${roomCapacity + 1}-${maxCapacity} registrations.`,
+      );
+    }
+  }
+
+  private assertStageConfig(data: CreateTournamentInput): void {
+    const roomCapacity = this.modeCapacity(data.mode);
+    const expectedQualifierRooms = Math.ceil(data.maxUnits / roomCapacity);
+    const stageConfig = data.stageConfig;
+
+    if (!stageConfig) {
+      throw new BadRequestError(
+        ErrorCodes.VALIDATION_FAILED,
+        'Stage configuration is required before creating a tournament.',
+      );
+    }
+
+    if (data.structureType === 'direct_final') {
+      if (stageConfig.finalMatches < 1 || stageConfig.qualifierRooms !== 0) {
+        throw new BadRequestError(
+          ErrorCodes.VALIDATION_FAILED,
+          'Direct final tournaments must configure only final matches.',
+        );
+      }
+      return;
+    }
+
+    if (stageConfig.qualifierRooms !== expectedQualifierRooms) {
+      throw new BadRequestError(
+        ErrorCodes.VALIDATION_FAILED,
+        `Qualifier room count must be ${expectedQualifierRooms}.`,
+      );
+    }
+
+    if (stageConfig.qualifierMatchesPerRoom < 1) {
+      throw new BadRequestError(
+        ErrorCodes.VALIDATION_FAILED,
+        'Qualifier tournaments require matches per qualifier room.',
+      );
+    }
+
+    const finalists =
+      stageConfig.qualifierRooms * stageConfig.advancingPerQualifier;
+    if (finalists < 1 || finalists > roomCapacity) {
+      throw new BadRequestError(
+        ErrorCodes.CAPACITY_EXCEEDED,
+        `Finalists must fit one ${data.mode} final room.`,
       );
     }
   }

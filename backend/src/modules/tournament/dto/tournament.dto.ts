@@ -14,6 +14,26 @@ const FundingTypeSchema = z.enum([
   'entry_fee',
 ]);
 
+const StageConfigSchema = z.object({
+  qualifierRooms: z.number().int().min(0).max(4).default(0),
+  qualifierMatchesPerRoom: z.number().int().min(0).max(12).default(0),
+  advancingPerQualifier: z.number().int().min(0).max(48).default(0),
+  finalMatches: z.number().int().min(1).max(12),
+  pointsResetBeforeFinal: z.boolean().default(true),
+  matchSchedule: z
+    .array(
+      z.object({
+        stage: z.enum(['qualifier', 'final']),
+        roomOrder: z.number().int().min(1).max(4),
+        matchOrder: z.number().int().min(1).max(12),
+        scheduledAt: z.string().datetime().optional(),
+        map: z.string().max(40).optional(),
+      }),
+    )
+    .max(60)
+    .default([]),
+});
+
 export const CreateTournamentSchema = z.object({
   title: z.string().min(3).max(100),
   description: z.string().max(2000).optional(),
@@ -21,7 +41,7 @@ export const CreateTournamentSchema = z.object({
   fundingType: FundingTypeSchema,
   structureType: z.enum(['direct_final', 'qualifiers_to_final']),
   scoringModel: z.enum(['combined', 'placement_only', 'kills_only']),
-  maxUnits: z.number().int().min(2).max(48),
+  maxUnits: z.number().int().min(2).max(192),
   entryFeePaise: z.number().int().min(0).optional(),
   prizePoolPaise: z.number().int().min(0).optional(),
   scheduledStartAt: z.string().datetime().optional(),
@@ -30,7 +50,8 @@ export const CreateTournamentSchema = z.object({
   checkInDurationMin: z.number().int().min(5).max(60).optional(),
   disputeWindowHours: z.number().int().min(1).max(72).optional(),
   gameMapId: z.string().uuid().optional(),
-  rulesText: z.string().max(5000).optional(),
+  rulesText: z.string().max(12000).optional(),
+  stageConfig: StageConfigSchema.optional(),
 });
 
 export type CreateTournamentInput = z.infer<typeof CreateTournamentSchema>;
@@ -43,7 +64,8 @@ export const UpdateTournamentSchema = z.object({
   description: z.string().max(2000).optional(),
   mode: z.enum(['solo', 'duo', 'squad']).optional(),
   fundingType: FundingTypeSchema.optional(),
-  maxUnits: z.number().int().min(2).max(48).optional(),
+  structureType: z.enum(['direct_final', 'qualifiers_to_final']).optional(),
+  maxUnits: z.number().int().min(2).max(192).optional(),
   entryFeePaise: z.number().int().min(0).optional(),
   prizePoolPaise: z.number().int().min(0).optional(),
   scheduledStartAt: z.string().datetime().optional(),
@@ -52,7 +74,7 @@ export const UpdateTournamentSchema = z.object({
   checkInDurationMin: z.number().int().min(5).max(60).optional(),
   disputeWindowHours: z.number().int().min(1).max(72).optional(),
   gameMapId: z.string().uuid().optional(),
-  rulesText: z.string().max(5000).optional(),
+  rulesText: z.string().max(12000).optional(),
   bannerAssetId: z.string().uuid().optional(),
 });
 

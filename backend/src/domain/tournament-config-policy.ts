@@ -14,14 +14,14 @@ const REQUIRED_TIEBREAK_ORDER = [
 ] as const;
 
 interface TournamentShape {
-  mode: string;
-  maxUnits: number;
+  placementSlots: number;
 }
 
 interface PrizeTournamentShape {
   fundingType?: string;
   prizePoolPaise: bigint;
-  maxUnits: number;
+  placementSlots?: number;
+  prizeSlots?: number;
 }
 
 interface PublishedConfigShape {
@@ -70,7 +70,7 @@ export function assertScoringConfig(
     );
   }
 
-  assertCompletePlacementTable(tournament.maxUnits, data.placementPoints);
+  assertCompletePlacementTable(tournament.placementSlots, data.placementPoints);
 }
 
 export function assertPrizeConfig(
@@ -94,7 +94,8 @@ export function assertPrizeConfig(
         'Prize rules must target exact final ranks; ranges are not allowed.',
       );
     }
-    if (rule.rankStart > tournament.maxUnits) {
+    const prizeSlots = tournament.prizeSlots ?? tournament.placementSlots ?? 0;
+    if (rule.rankStart > prizeSlots) {
       throw new BadRequestError(
         ErrorCodes.VALIDATION_FAILED,
         'Prize rank exceeds tournament capacity.',
@@ -135,7 +136,8 @@ export function assertPublishableConfig(
     );
   }
 
-  if (config.placementPoints.length !== tournament.maxUnits) {
+  const placementSlots = tournament.placementSlots ?? 0;
+  if (config.placementPoints.length !== placementSlots) {
     throw new BadRequestError(
       ErrorCodes.INVALID_PLACEMENT,
       'Active scoring config must include a complete placement table.',

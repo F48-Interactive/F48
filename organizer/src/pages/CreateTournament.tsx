@@ -1,178 +1,141 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { api, getErrorMessage, idempotencyKey } from '../lib/api';
 import { ArrowLeft, ArrowRight, Check, Loader2 } from 'lucide-react';
+import { api, getErrorMessage, idempotencyKey } from '../lib/api';
+import { useAuth } from '../hooks/useAuth';
+import { STEPS } from './create-tournament/constants';
+import {
+  DetailsStep,
+  ModeStep,
+  StructureStep,
+  TypeStep,
+} from './create-tournament/BasicsSteps';
+import {
+  RegistrationStep,
+  ScheduleStep,
+} from './create-tournament/OperationsSteps';
+import { ScoringStep, TiebreakStep } from './create-tournament/ScoringSteps';
+import {
+  PreviewStep,
+  PrizeStep,
+  RulesStep,
+} from './create-tournament/PrizeRulesSteps';
+import {
+  defaultForm,
+  leaderboardPrizeRules,
+  metadata,
+  placementPayload,
+  roomCount,
+  rupeesToPaise,
+  toIso,
+} from './create-tournament/helpers';
+import type { TournamentForm } from './create-tournament/types';
 import './CreateTournament.css';
 
-type TournamentMode = 'solo' | 'duo' | 'squad';
-type FundingType = 'free' | 'organizer_funded' | 'f48_sponsored' | 'entry_fee';
-type StructureType = 'direct_final' | 'qualifiers_to_final';
-type ScoringModel = 'combined' | 'placement_only' | 'kills_only';
+const DRAFT_KEY = 'f48_full_tournament_draft';
 
-interface FormData {
-  title: string;
-  description: string;
-  mode: TournamentMode;
-  maxUnits: number;
-  fundingType: FundingType;
-  prizePoolRupees: string;
-  structureType: StructureType;
-  scoringModel: ScoringModel;
-  scheduledStartAt: string;
-  registrationOpenAt: string;
-  registrationCloseAt: string;
+interface CreatedTournament {
+  id: string;
 }
 
 interface ScoringConfig {
   id: string;
 }
 
-const STEPS = ['Details', 'Mode', 'Funding', 'Schedule', 'Review'];
-const MAX_UNITS_MAP: Record<TournamentMode, number> = { solo: 48, duo: 24, squad: 12 };
-const FUNDED_TYPES: FundingType[] = ['organizer_funded', 'f48_sponsored'];
+interface MediaAsset {
+  id: string;
+}
 
-const DEFAULT: FormData = {
-  title: '',
-  description: '',
-  mode: 'solo',
-  maxUnits: 48,
-  fundingType: 'free',
-  prizePoolRupees: '',
-  structureType: 'direct_final',
-  scoringModel: 'combined',
-  scheduledStartAt: '',
-  registrationOpenAt: '',
-  registrationCloseAt: '',
-};
-
-const MODES = [
-  { value: 'solo' as const, label: 'Solo', desc: '48 players, 1 per slot' },
-  { value: 'duo' as const, label: 'Duo', desc: '24 teams x 2 players' },
-  { value: 'squad' as const, label: 'Squad', desc: '12 teams x 4 players' },
-];
-
-const FUNDING_TYPES = [
-  { value: 'free' as const, label: 'Free Entry', desc: 'No entry fee, no prize pool' },
-  { value: 'organizer_funded' as const, label: 'Organizer Funded', desc: 'You fund the prize pool' },
-  { value: 'f48_sponsored' as const, label: 'F48 Sponsored', desc: 'F48 sponsors the prize pool' },
-  { value: 'entry_fee' as const, label: 'Entry Fee', desc: 'Coming soon - requires wallet support', disabled: true },
-];
-
-function loadDraft(): FormData {
-  const saved = localStorage.getItem('f48_draft_tournament');
-  if (!saved) return DEFAULT;
-
+function loadDraft(): TournamentForm {
+  const saved = localStorage.getItem(DRAFT_KEY);
+  if (!saved) return defaultForm();
   try {
-    return { ...DEFAULT, ...JSON.parse(saved) };
+    return { ...defaultForm(), ...JSON.parse(saved) };
   } catch {
-    localStorage.removeItem('f48_draft_tournament');
-    return DEFAULT;
+    localStorage.removeItem(DRAFT_KEY);
+    return defaultForm();
   }
-}
-
-function toIsoOrUndefined(value: string): string | undefined {
-  return value ? new Date(value).toISOString() : undefined;
-}
-
-function toPrizePoolPaise(value: string): number {
-  const rupees = Number(value);
-  if (!Number.isFinite(rupees) || rupees <= 0) return 0;
-  return Math.round(rupees * 100);
-}
-
-function requiresPrizePool(fundingType: FundingType): boolean {
-  return FUNDED_TYPES.includes(fundingType);
-}
-
-function getScheduleError(form: FormData): string | null {
-  const open = form.registrationOpenAt ? new Date(form.registrationOpenAt).getTime() : null;
-  const close = form.registrationCloseAt ? new Date(form.registrationCloseAt).getTime() : null;
-  const start = form.scheduledStartAt ? new Date(form.scheduledStartAt).getTime() : null;
-
-  if (open && close && open >= close) {
-    return 'Registration close time must be after registration open time.';
-  }
-  if (close && start && close >= start) {
-    return 'Tournament start time must be after registration close time.';
-  }
-  return null;
-}
-
-function defaultPlacementPoints(maxUnits: number) {
-  return Array.from({ length: maxUnits }, (_, index) => ({
-    position: index + 1,
-    points: (maxUnits - index - 1).toFixed(2),
-  }));
 }
 
 export function CreateTournament() {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const organizerChannel = user?.organizer?.youtubeChannels?.[0];
   const [step, setStep] = useState(0);
-  const [form, setForm] = useState<FormData>(loadDraft);
+  const [form, setFormState] = useState<TournamentForm>(loadDraft);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const prizePoolPaise = toPrizePoolPaise(form.prizePoolRupees);
-  const scheduleError = getScheduleError(form);
-
-  const update = (patch: Partial<FormData>) => {
-    const next = { ...form, ...patch };
-    if (patch.mode) {
-      next.maxUnits = MAX_UNITS_MAP[patch.mode];
-    }
-    if (patch.fundingType === 'free') {
-      next.prizePoolRupees = '';
-    }
-    setForm(next);
-    localStorage.setItem('f48_draft_tournament', JSON.stringify(next));
+  const setForm = (next: TournamentForm) => {
+    setFormState(next);
+    localStorage.setItem(DRAFT_KEY, JSON.stringify(next));
   };
 
-  const canProceed = (): boolean => {
-    if (step === 0) return form.title.trim().length >= 3;
-    if (step === 1) return !!form.mode && form.maxUnits === MAX_UNITS_MAP[form.mode];
-    if (step === 2) return !requiresPrizePool(form.fundingType) || prizePoolPaise > 0;
-    if (step === 3) return !scheduleError;
-    return true;
-  };
+  useEffect(() => {
+    localStorage.setItem(DRAFT_KEY, JSON.stringify(form));
+  }, [form]);
 
-  const handleCreateDraft = async () => {
+  const errors = validate(form, true);
+  const canContinue = validateStep(form, step).length === 0;
+
+  const submit = async (publish: boolean) => {
+    const validation = validate(form, publish);
+    if (validation.length > 0) {
+      setError(validation[0] ?? 'Please complete required fields.');
+      return;
+    }
+
     setIsSubmitting(true);
     setError(null);
-
     try {
-      const tournament = await api.post<{ id: string }>('/tournaments', {
-        title: form.title.trim(),
-        description: form.description.trim() || undefined,
-        mode: form.mode,
-        fundingType: form.fundingType,
-        structureType: form.structureType,
-        scoringModel: form.scoringModel,
-        maxUnits: form.maxUnits,
-        prizePoolPaise: prizePoolPaise || undefined,
-        scheduledStartAt: toIsoOrUndefined(form.scheduledStartAt),
-        registrationOpenAt: toIsoOrUndefined(form.registrationOpenAt),
-        registrationCloseAt: toIsoOrUndefined(form.registrationCloseAt),
-      }, idempotencyKey());
+      const tournament = await api.post<CreatedTournament>(
+        '/tournaments',
+        tournamentPayload(form),
+        idempotencyKey(),
+      );
+
+      if (form.bannerUrl.trim()) {
+        const asset = await api.post<MediaAsset>('/media/register', {
+          purpose: 'tournament_banner',
+          url: form.bannerUrl.trim(),
+        });
+        await api.patch(`/tournaments/${tournament.id}`, { bannerAssetId: asset.id });
+      }
 
       const config = await api.post<ScoringConfig>(
         `/tournaments/${tournament.id}/scoring-config`,
+        scoringPayload(form),
+        idempotencyKey(),
+      );
+
+      await api.post(
+        `/tournaments/${tournament.id}/config/${config.id}/tiebreaks`,
         {
-          scoringModel: form.scoringModel,
-          killMultiplier: form.scoringModel === 'placement_only' ? '0.00' : '1.00',
-          placementPoints: defaultPlacementPoints(form.maxUnits),
+          rules: form.tiebreakers.map((field, index) => ({
+            priority: index + 1,
+            field,
+          })),
         },
         idempotencyKey(),
       );
 
-      if (prizePoolPaise > 0) {
+      if (form.fundingType !== 'free') {
         await api.post(
           `/tournaments/${tournament.id}/config/${config.id}/prizes`,
-          { rules: [{ rankStart: 1, rankEnd: 1, amountPaise: prizePoolPaise }] },
+          { rules: leaderboardPrizeRules(form) },
           idempotencyKey(),
         );
       }
 
-      localStorage.removeItem('f48_draft_tournament');
+      if (publish) {
+        await api.post(
+          `/tournaments/${tournament.id}/transition`,
+          { action: 'publish' },
+          idempotencyKey(),
+        );
+      }
+
+      localStorage.removeItem(DRAFT_KEY);
       navigate(`/tournaments/${tournament.id}`, { replace: true });
     } catch (err: unknown) {
       setError(getErrorMessage(err, 'Failed to create tournament.'));
@@ -187,154 +150,165 @@ export function CreateTournament() {
         <button className="btn btn-ghost" onClick={() => navigate('/tournaments')}>
           <ArrowLeft size={16} /> Back
         </button>
-        <h1>Create Tournament</h1>
+        <div>
+          <h1>Create Tournament</h1>
+          <p className="text-secondary">Build the full player-facing tournament contract.</p>
+        </div>
       </div>
 
-      <div className="steps">
+      <div className="steps create-steps">
         {STEPS.map((label, index) => (
-          <div key={label} className={`step ${index === step ? 'step-active' : ''} ${index < step ? 'step-done' : ''}`}>
-            <div className="step-number">
-              {index < step ? <Check size={14} /> : index + 1}
-            </div>
+          <button
+            key={label}
+            type="button"
+            className={`step ${index === step ? 'step-active' : ''} ${index < step ? 'step-done' : ''}`}
+            onClick={() => setStep(index)}
+          >
+            <span className="step-number">{index < step ? <Check size={14} /> : index + 1}</span>
             <span className="step-label">{label}</span>
-          </div>
+          </button>
         ))}
       </div>
 
-      <div className="create-content card">
-        {step === 0 && (
-          <div className="create-step">
-            <h2>Tournament Details</h2>
-            <p className="text-secondary">Give your tournament a clear name and optional details.</p>
-            <div className="create-fields">
-              <div className="input-group">
-                <label className="input-label" htmlFor="title">Tournament Title *</label>
-                <input id="title" className="input" placeholder="e.g. Weekly Showdown #5" value={form.title} onChange={(event) => update({ title: event.target.value })} autoFocus />
-              </div>
-              <div className="input-group">
-                <label className="input-label" htmlFor="desc">Description</label>
-                <textarea id="desc" className="input textarea" placeholder="Rules, details, or announcements..." value={form.description} onChange={(event) => update({ description: event.target.value })} />
-              </div>
-            </div>
-          </div>
-        )}
+      <div className="create-content card">{renderStep(step, form, setForm, organizerChannel)}</div>
 
-        {step === 1 && (
-          <div className="create-step">
-            <h2>Mode & Capacity</h2>
-            <p className="text-secondary">Capacity is locked to the backend-approved Free Fire format.</p>
-            <div className="mode-grid">
-              {MODES.map((mode) => (
-                <button key={mode.value} className={`mode-option ${form.mode === mode.value ? 'mode-selected' : ''}`} onClick={() => update({ mode: mode.value })}>
-                  <span className="mode-option-label">{mode.label}</span>
-                  <span className="mode-option-desc">{mode.desc}</span>
-                </button>
-              ))}
-            </div>
-            <div className="review-item" style={{ marginTop: 'var(--space-4)' }}>
-              <span className="review-label">Backend capacity</span>
-              <span className="review-value">{form.maxUnits} {form.mode === 'solo' ? 'players' : 'teams'}</span>
-            </div>
-          </div>
-        )}
-
-        {step === 2 && (
-          <div className="create-step">
-            <h2>Funding Type</h2>
-            <p className="text-secondary">Entry-fee tournaments stay disabled until wallet support is ready.</p>
-            <div className="mode-grid">
-              {FUNDING_TYPES.map((funding) => (
-                <button key={funding.value} className={`mode-option ${form.fundingType === funding.value ? 'mode-selected' : ''} ${funding.disabled ? 'mode-disabled' : ''}`} onClick={() => !funding.disabled && update({ fundingType: funding.value })} disabled={funding.disabled}>
-                  <span className="mode-option-label">{funding.label}</span>
-                  <span className="mode-option-desc">{funding.desc}</span>
-                </button>
-              ))}
-            </div>
-            {requiresPrizePool(form.fundingType) && (
-              <div className="input-group" style={{ marginTop: 'var(--space-5)' }}>
-                <label className="input-label" htmlFor="prizePool">Prize Pool (INR) *</label>
-                <input id="prizePool" className="input" type="number" min="1" step="1" placeholder="5000" value={form.prizePoolRupees} onChange={(event) => update({ prizePoolRupees: event.target.value })} />
-              </div>
-            )}
-          </div>
-        )}
-
-        {step === 3 && (
-          <div className="create-step">
-            <h2>Schedule</h2>
-            <p className="text-secondary">Dates are optional, but their order must be valid.</p>
-            <div className="create-fields">
-              <div className="input-group">
-                <label className="input-label">Tournament Start</label>
-                <input className="input" type="datetime-local" value={form.scheduledStartAt} onChange={(event) => update({ scheduledStartAt: event.target.value })} />
-              </div>
-              <div className="input-group">
-                <label className="input-label">Registration Opens</label>
-                <input className="input" type="datetime-local" value={form.registrationOpenAt} onChange={(event) => update({ registrationOpenAt: event.target.value })} />
-              </div>
-              <div className="input-group">
-                <label className="input-label">Registration Closes</label>
-                <input className="input" type="datetime-local" value={form.registrationCloseAt} onChange={(event) => update({ registrationCloseAt: event.target.value })} />
-              </div>
-            </div>
-            {scheduleError && <p style={{ color: 'var(--error)', fontSize: '0.875rem' }}>{scheduleError}</p>}
-          </div>
-        )}
-
-        {step === 4 && (
-          <div className="create-step">
-            <h2>Review</h2>
-            <p className="text-secondary">This creates a draft with default combined scoring configured.</p>
-            <div className="review-grid">
-              <div className="review-item">
-                <span className="review-label">Title</span>
-                <span className="review-value">{form.title}</span>
-              </div>
-              <div className="review-item">
-                <span className="review-label">Mode</span>
-                <span className="review-value">{form.mode.toUpperCase()}</span>
-              </div>
-              <div className="review-item">
-                <span className="review-label">Capacity</span>
-                <span className="review-value">{form.maxUnits} {form.mode === 'solo' ? 'players' : 'teams'}</span>
-              </div>
-              <div className="review-item">
-                <span className="review-label">Funding</span>
-                <span className="review-value" style={{ textTransform: 'capitalize' }}>{form.fundingType.replace(/_/g, ' ')}</span>
-              </div>
-              {prizePoolPaise > 0 && (
-                <div className="review-item">
-                  <span className="review-label">Prize Pool</span>
-                  <span className="review-value">INR {Number(form.prizePoolRupees).toLocaleString()}</span>
-                </div>
-              )}
-              {form.scheduledStartAt && (
-                <div className="review-item">
-                  <span className="review-label">Start</span>
-                  <span className="review-value">{new Date(form.scheduledStartAt).toLocaleString()}</span>
-                </div>
-              )}
-            </div>
-            {error && <p style={{ color: 'var(--error)', fontSize: '0.875rem', marginTop: 'var(--space-3)' }}>{error}</p>}
-          </div>
-        )}
-      </div>
+      {error && <p className="form-error">{error}</p>}
 
       <div className="create-nav">
-        <button className="btn btn-ghost" onClick={() => setStep(step - 1)} disabled={step === 0}>
+        <button className="btn btn-ghost" onClick={() => setStep(Math.max(0, step - 1))} disabled={step === 0}>
           <ArrowLeft size={16} /> Previous
         </button>
-        {step < STEPS.length - 1 ? (
-          <button className="btn btn-primary" onClick={() => setStep(step + 1)} disabled={!canProceed()}>
-            Next <ArrowRight size={16} />
+        <div className="create-actions">
+          <button className="btn btn-secondary" onClick={() => void submit(false)} disabled={isSubmitting}>
+            Save Draft
           </button>
-        ) : (
-          <button className="btn btn-primary" onClick={handleCreateDraft} disabled={isSubmitting || !canProceed()}>
-            {isSubmitting ? <Loader2 size={16} className="spinning" /> : null}
-            {isSubmitting ? 'Creating...' : 'Create Draft'}
-          </button>
-        )}
+          {step < STEPS.length - 1 ? (
+            <button className="btn btn-primary" onClick={() => setStep(step + 1)} disabled={!canContinue}>
+              Next <ArrowRight size={16} />
+            </button>
+          ) : (
+            <button className="btn btn-primary" onClick={() => void submit(true)} disabled={isSubmitting || errors.length > 0}>
+              {isSubmitting ? <Loader2 size={16} className="spinning" /> : null}
+              Publish Tournament
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );
+}
+
+function renderStep(
+  step: number,
+  form: TournamentForm,
+  setForm: (form: TournamentForm) => void,
+  organizerChannel: Parameters<typeof DetailsStep>[0]['organizerChannel'],
+) {
+  const props = { form, setForm, organizerChannel };
+  if (step === 0) return <TypeStep {...props} />;
+  if (step === 1) return <DetailsStep {...props} />;
+  if (step === 2) return <ModeStep {...props} />;
+  if (step === 3) return <StructureStep {...props} />;
+  if (step === 4) return <RegistrationStep {...props} />;
+  if (step === 5) return <ScheduleStep {...props} />;
+  if (step === 6) return <ScoringStep {...props} />;
+  if (step === 7) return <TiebreakStep {...props} />;
+  if (step === 8) return <PrizeStep {...props} />;
+  if (step === 9) return <RulesStep {...props} />;
+  return <PreviewStep {...props} />;
+}
+
+function tournamentPayload(form: TournamentForm) {
+  const firstMatch = form.matchSchedule.find((row) => row.scheduledAt);
+  return {
+    title: form.title.trim(),
+    description: [form.shortDescription, form.fullDescription].filter(Boolean).join('\n\n'),
+    mode: form.mode,
+    fundingType: form.fundingType,
+    structureType: form.structureType,
+    scoringModel: form.scoringModel,
+    maxUnits: form.maxUnits,
+    prizePoolPaise: form.fundingType === 'free' ? undefined : rupeesToPaise(form.prizePoolRupees),
+    scheduledStartAt: toIso(firstMatch?.scheduledAt ?? ''),
+    registrationOpenAt: toIso(form.registrationOpenAt),
+    registrationCloseAt: toIso(form.registrationCloseAt),
+    checkInDurationMin: form.checkInDurationMin,
+    disputeWindowHours: form.disputeWindowHours,
+    rulesText: metadata(form),
+    stageConfig: {
+      qualifierRooms: form.structureType === 'qualifiers_to_final' ? roomCount(form) : 0,
+      qualifierMatchesPerRoom: form.structureType === 'qualifiers_to_final' ? form.qualifierMatchesPerRoom : 0,
+      advancingPerQualifier: form.structureType === 'qualifiers_to_final' ? form.advancingPerQualifier : 0,
+      finalMatches: form.finalMatches,
+      pointsResetBeforeFinal: form.pointsResetBeforeFinal,
+      matchSchedule: form.matchSchedule.map((row) => ({
+        stage: row.stage,
+        roomOrder: row.roomOrder,
+        matchOrder: row.matchOrder,
+        scheduledAt: toIso(row.scheduledAt),
+        map: row.map,
+      })),
+    },
+  };
+}
+
+function scoringPayload(form: TournamentForm) {
+  return {
+    scoringModel: form.scoringModel,
+    killMultiplier: form.scoringModel === 'placement_only'
+      ? '0.00'
+      : Number(form.pointsPerKill || 0).toFixed(2),
+    placementPoints: placementPayload(form),
+  };
+}
+
+function validate(form: TournamentForm, publish: boolean): string[] {
+  const errors: string[] = [];
+  if (form.title.trim().length < 3) errors.push('Tournament name is required.');
+  if (form.fundingType === 'entry_fee') errors.push('Entry-fee tournaments are coming later.');
+  if (form.fundingType !== 'free' && rupeesToPaise(form.prizePoolRupees) <= 0) errors.push('Prize pool is required.');
+  if (form.structureType === 'direct_final' && roomCount(form) > 1) errors.push('Direct finals cannot exceed one room.');
+  if (form.structureType === 'qualifiers_to_final' && roomCount(form) <= 1) errors.push('Qualifiers require more than one room.');
+  if (form.scoringModel !== 'placement_only' && Number(form.pointsPerKill) <= 0) errors.push('Kill points must be greater than zero.');
+  if (form.placementPoints[form.placementPoints.length - 1] !== '0') errors.push('Last placement position must be zero.');
+  if (new Set(form.tiebreakers).size !== form.tiebreakers.length) errors.push('Tie-breakers cannot repeat.');
+  if (form.tiebreakers.length < 3) errors.push('Required tie-breakers are missing.');
+
+  if (publish) {
+    if (!form.bannerUrl.trim()) errors.push('Tournament banner URL is required before publishing.');
+    if (!form.registrationOpenAt || !form.registrationCloseAt) errors.push('Registration dates are required before publishing.');
+    if (!form.matchSchedule.every((row) => row.scheduledAt && row.map)) errors.push('Every match needs a time and map.');
+    if (form.fundingType !== 'free' && leaderboardTotal(form) !== rupeesToPaise(form.prizePoolRupees)) {
+      errors.push('Official leaderboard prize rows must sum exactly to the prize pool.');
+    }
+  }
+  return errors;
+}
+
+function validateStep(form: TournamentForm, step: number): string[] {
+  if (step === 0) {
+    if (form.fundingType === 'entry_fee') return ['Entry-fee tournaments are coming later.'];
+    if (form.fundingType !== 'free' && rupeesToPaise(form.prizePoolRupees) <= 0) return ['Prize pool is required.'];
+  }
+  if (step === 1 && form.title.trim().length < 3) return ['Tournament name is required.'];
+  if (step === 3) {
+    if (form.structureType === 'direct_final' && roomCount(form) > 1) return ['Direct finals cannot exceed one room.'];
+    if (form.structureType === 'qualifiers_to_final' && roomCount(form) <= 1) return ['Qualifiers require more than one room.'];
+  }
+  if (step === 6 && form.scoringModel !== 'placement_only' && Number(form.pointsPerKill) <= 0) {
+    return ['Kill points must be greater than zero.'];
+  }
+  if (step === 7 && form.tiebreakers.length < 3) return ['Required tie-breakers are missing.'];
+  if (
+    step === 8 &&
+    form.fundingType !== 'free' &&
+    leaderboardTotal(form) !== rupeesToPaise(form.prizePoolRupees)
+  ) {
+    return ['Official leaderboard prize rows must sum exactly to the prize pool.'];
+  }
+  return [];
+}
+
+function leaderboardTotal(form: TournamentForm): number {
+  return form.prizeRows.reduce((sum, row) => sum + rupeesToPaise(row.amountRupees), 0);
 }

@@ -56,35 +56,40 @@ export class TournamentService {
       );
     }
 
-    const tournament = await this.prisma.tournament.create({
-      data: {
-        organizerId: organizer.id,
-        title: data.title,
-        description: data.description,
-        mode: data.mode,
-        fundingType: data.fundingType,
-        structureType: data.structureType,
-        scoringModel: data.scoringModel,
-        maxUnits: data.maxUnits,
-        entryFeePaise: data.entryFeePaise ? BigInt(data.entryFeePaise) : null,
-        prizePoolPaise: data.prizePoolPaise
-          ? BigInt(data.prizePoolPaise)
-          : 0n,
-        scheduledStartAt: data.scheduledStartAt
-          ? new Date(data.scheduledStartAt)
-          : null,
-        registrationOpenAt: data.registrationOpenAt
-          ? new Date(data.registrationOpenAt)
-          : null,
-        registrationCloseAt: data.registrationCloseAt
-          ? new Date(data.registrationCloseAt)
-          : null,
-        checkInDurationMin: data.checkInDurationMin,
-        disputeWindowHours: data.disputeWindowHours ?? 24,
-        gameMapId: data.gameMapId,
-        rulesText: data.rulesText,
-        status: 'draft',
-      },
+    const tournament = await this.prisma.$transaction(async (tx) => {
+      const db = tx as unknown as PrismaService;
+      const created = await db.tournament.create({
+        data: {
+          organizerId: organizer.id,
+          title: data.title,
+          description: data.description,
+          mode: data.mode,
+          fundingType: data.fundingType,
+          structureType: data.structureType,
+          scoringModel: data.scoringModel,
+          maxUnits: data.maxUnits,
+          entryFeePaise: data.entryFeePaise ? BigInt(data.entryFeePaise) : null,
+          prizePoolPaise: data.prizePoolPaise
+            ? BigInt(data.prizePoolPaise)
+            : 0n,
+          scheduledStartAt: data.scheduledStartAt
+            ? new Date(data.scheduledStartAt)
+            : null,
+          registrationOpenAt: data.registrationOpenAt
+            ? new Date(data.registrationOpenAt)
+            : null,
+          registrationCloseAt: data.registrationCloseAt
+            ? new Date(data.registrationCloseAt)
+            : null,
+          checkInDurationMin: data.checkInDurationMin,
+          disputeWindowHours: data.disputeWindowHours ?? 24,
+          gameMapId: data.gameMapId,
+          rulesText: data.rulesText,
+          status: 'draft',
+        },
+      });
+      await this.createStructure(db, created.id, data);
+      return created;
     });
 
     await this.audit.log({
@@ -128,6 +133,9 @@ export class TournamentService {
         ...(data.mode !== undefined && { mode: data.mode }),
         ...(data.fundingType !== undefined && {
           fundingType: data.fundingType,
+        }),
+        ...(data.structureType !== undefined && {
+          structureType: data.structureType,
         }),
         ...(data.maxUnits !== undefined && { maxUnits: data.maxUnits }),
         ...(data.entryFeePaise !== undefined && {
@@ -221,5 +229,122 @@ export class TournamentService {
       'Tournament transitioned',
     );
     return updated;
+  }
+
+  private async createStructure(
+    db: PrismaService,
+    tournamentId: string,
+    data: CreateTournamentInput,
+  ): Promise<void> {
+    const config = data.stageConfig!;
+    const roomCapacity = this.authority.modeCapacity(data.mode);
+    let matchNumber = 1;
+
+    if (data.structureType === 'qualifiers_to_final') {
+      const qualifierStage = await db.tournamentStage.create({
+        data: {
+          tournamentId,
+          type: 'qualifier',
+          name: 'Qualifiers',
+          stageOrder: 1,
+          advancementCount: config.advancingPerQualifier,
+          pointsCarryForward: !config.pointsResetBeforeFinal,
+          checkInDurationMin: data.checkInDurationMin,
+        },
+      });
+
+      for (let roomOrder = 1; roomOrder <= config.qualifierRooms; roomOrder += 1) {
+        const remaining = data.maxUnits - (roomOrder - 1) * roomCapacity;
+        const room = await db.tournamentRoom.create({
+          data: {
+            tournamentId,
+            stageId: qualifierStage.id,
+            name: `Qualifier ${roomOrder}`,
+            maxUnits: Math.min(roomCapacity, remaining),
+            roomOrder,
+          },
+        });
+        matchNumber = await this.createMatches(
+          db,
+          tournamentId,
+          qualifierStage.id,
+          room.id,
+          matchNumber,
+          config.qualifierMatchesPerRoom,
+          'qualifier',
+          roomOrder,
+          data,
+        );
+      }
+    }
+
+    const finalStage = await db.tournamentStage.create({
+      data: {
+        tournamentId,
+        type: 'final',
+        name: 'Final',
+        stageOrder: data.structureType === 'direct_final' ? 1 : 2,
+        advancementCount: null,
+        pointsCarryForward: data.structureType === 'direct_final'
+          ? false
+          : !config.pointsResetBeforeFinal,
+        checkInDurationMin: data.checkInDurationMin,
+      },
+    });
+    const finalRoom = await db.tournamentRoom.create({
+      data: {
+        tournamentId,
+        stageId: finalStage.id,
+        name: 'Final Room',
+        maxUnits: Math.min(roomCapacity, data.maxUnits),
+        roomOrder: 1,
+      },
+    });
+    await this.createMatches(
+      db,
+      tournamentId,
+      finalStage.id,
+      finalRoom.id,
+      matchNumber,
+      config.finalMatches,
+      'final',
+      1,
+      data,
+    );
+  }
+
+  private async createMatches(
+    db: PrismaService,
+    tournamentId: string,
+    stageId: string,
+    roomId: string,
+    startNumber: number,
+    count: number,
+    stage: 'qualifier' | 'final',
+    roomOrder: number,
+    data: CreateTournamentInput,
+  ): Promise<number> {
+    let matchNumber = startNumber;
+    for (let matchOrder = 1; matchOrder <= count; matchOrder += 1) {
+      const scheduled = data.stageConfig!.matchSchedule.find(
+        (entry) =>
+          entry.stage === stage &&
+          entry.roomOrder === roomOrder &&
+          entry.matchOrder === matchOrder,
+      );
+      await db.tournamentMatch.create({
+        data: {
+          tournamentId,
+          stageId,
+          roomId,
+          matchNumber,
+          scheduledAt: scheduled?.scheduledAt
+            ? new Date(scheduled.scheduledAt)
+            : null,
+        },
+      });
+      matchNumber += 1;
+    }
+    return matchNumber;
   }
 }

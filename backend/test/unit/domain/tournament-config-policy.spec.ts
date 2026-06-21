@@ -3,7 +3,7 @@ import {
   assertScoringConfig,
 } from '../../../src/domain/tournament-config-policy.js';
 
-const squadTournament = { mode: 'squad', maxUnits: 12 };
+const squadTournament = { placementSlots: 12 };
 
 function placement(points: number[]) {
   return points.map((value, index) => ({
@@ -36,7 +36,7 @@ describe('tournament config policy', () => {
   it('rejects publish without tie-breakers', () => {
     expect(() =>
       assertPublishableConfig(
-        { fundingType: 'free', prizePoolPaise: 0n, maxUnits: 12 },
+        { fundingType: 'free', prizePoolPaise: 0n, placementSlots: 12 },
         {
           placementPoints: Array(12).fill({}),
           prizeRules: [],
@@ -52,7 +52,8 @@ describe('tournament config policy', () => {
         {
           fundingType: 'organizer_funded',
           prizePoolPaise: 10_000n,
-          maxUnits: 12,
+          placementSlots: 12,
+          prizeSlots: 12,
         },
         {
           placementPoints: Array(12).fill({}),
