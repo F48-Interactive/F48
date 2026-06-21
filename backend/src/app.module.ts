@@ -43,6 +43,15 @@ import { RegistrationModule } from './modules/registration/registration.module.j
 // Phase 4: Match Lifecycle
 import { MatchModule } from './modules/match/match.module.js';
 
+// Phase 5: Scoring & Leaderboard
+import { ScoringModule } from './modules/scoring/scoring.module.js';
+
+// Phase 6: Disputes
+import { DisputeModule } from './modules/dispute/dispute.module.js';
+
+// Phase 7: Admin Moderation
+import { AdminModule } from './modules/admin/admin.module.js';
+
 // Providers
 import { ProviderModule } from './providers/provider.module.js';
 
@@ -130,6 +139,15 @@ import { ProviderModule } from './providers/provider.module.js';
 
     // Phase 4: Match Lifecycle
     MatchModule,
+
+    // Phase 5: Scoring & Leaderboard
+    ScoringModule,
+
+    // Phase 6: Disputes
+    DisputeModule,
+
+    // Phase 7: Admin Moderation
+    AdminModule,
   ],
 
   providers: [

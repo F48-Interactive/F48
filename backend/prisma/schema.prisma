@@ -757,3 +757,70 @@ model MatchPlayerResult {
   @@unique([matchResultId, registrationId])
   @@map("match_player_results")
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PHASE 6: DISPUTES
+// ─────────────────────────────────────────────────────────────────────────────
+
+enum DisputeStatus {
+  submitted
+  under_review
+  info_requested
+  investigating
+  resolved_accepted
+  resolved_rejected
+  resolved_partial
+  withdrawn
+}
+
+enum DisputeCategory {
+  incorrect_score
+  wrong_placement
+  kill_count_mismatch
+  wrong_player
+  technical_issue
+  rule_violation
+  unfair_play
+  other
+}
+
+/// Dispute filed against a match result (DISPUTE-001 to DISPUTE-008).
+model Dispute {
+  id                String          @id @default(uuid()) @db.Uuid
+  matchResultId     String          @map("match_result_id") @db.Uuid
+  filedByPlayerId   String          @map("filed_by_player_id") @db.Uuid
+  category          DisputeCategory
+  status            DisputeStatus   @default(submitted)
+  description       String
+  evidenceAssetIds  String[]        @map("evidence_asset_ids") @db.Uuid
+  adminAssignedId   String?         @map("admin_assigned_id") @db.Uuid
+  resolution        String?
+  resolvedAt        DateTime?       @map("resolved_at") @db.Timestamptz
+  createdAt         DateTime        @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt         DateTime        @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@index([matchResultId])
+  @@index([filedByPlayerId])
+  @@index([status])
+  @@map("disputes")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PHASE 7: ADMIN MODERATION
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Admin moderation action log.
+model AdminAction {
+  id            String   @id @default(uuid()) @db.Uuid
+  adminId       String   @map("admin_id") @db.Uuid
+  action        String   @db.VarChar(50)
+  targetType    String   @map("target_type") @db.VarChar(30)
+  targetId      String   @map("target_id") @db.Uuid
+  reason        String?
+  details       Json?
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  @@index([adminId])
+  @@index([targetType, targetId])
+  @@map("admin_actions")
+}
