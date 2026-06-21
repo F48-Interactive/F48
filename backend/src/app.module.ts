@@ -37,6 +37,12 @@ import { FundingModule } from './modules/funding/funding.module.js';
 import { BannerModule } from './modules/banner/banner.module.js';
 import { MediaModule } from './modules/media/media.module.js';
 
+// Phase 3: Registration & Check-in
+import { RegistrationModule } from './modules/registration/registration.module.js';
+
+// Phase 4: Match Lifecycle
+import { MatchModule } from './modules/match/match.module.js';
+
 // Providers
 import { ProviderModule } from './providers/provider.module.js';
 
@@ -118,6 +124,12 @@ import { ProviderModule } from './providers/provider.module.js';
     FundingModule,
     BannerModule,
     MediaModule,
+
+    // Phase 3: Registration & Check-in
+    RegistrationModule,
+
+    // Phase 4: Match Lifecycle
+    MatchModule,
   ],
 
   providers: [

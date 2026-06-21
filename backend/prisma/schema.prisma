@@ -412,6 +412,7 @@ model Tournament {
   configVersions  TournamentConfigVersion[]
   fundingRequest  FundingRequest?
   gameMap         MapCatalog?              @relation(fields: [gameMapId], references: [id])
+  registrations   Registration[]
 
   @@index([organizerId])
   @@index([status])
@@ -474,9 +475,11 @@ model TournamentMatch {
   updatedAt       DateTime    @updatedAt @map("updated_at") @db.Timestamptz
 
   // Relations
-  tournament  Tournament      @relation(fields: [tournamentId], references: [id])
-  stage       TournamentStage @relation(fields: [stageId], references: [id])
-  room        TournamentRoom  @relation(fields: [roomId], references: [id])
+  tournament      Tournament      @relation(fields: [tournamentId], references: [id])
+  stage           TournamentStage @relation(fields: [stageId], references: [id])
+  room            TournamentRoom  @relation(fields: [roomId], references: [id])
+  roomCredential  RoomCredential?
+  matchResult     MatchResult?
 
   @@unique([tournamentId, matchNumber])
   @@index([status])
@@ -620,3 +623,137 @@ model MediaAsset {
   @@map("media_assets")
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// PHASE 3 ENUMS
+// ─────────────────────────────────────────────────────────────────────────────
+
+enum RegistrationStatus {
+  pending_invite
+  confirmed
+  waitlisted
+  checked_in
+  no_show
+  withdrawn
+  disqualified
+  advanced
+  eliminated
+  canceled
+  refunded
+}
+
+enum TeamRole {
+  captain
+  member
+}
+
+enum ResultStatus {
+  draft
+  submitted
+  needs_correction
+  provisional
+  disputed
+  under_review
+  finalized
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PHASE 3: REGISTRATION & CHECK-IN
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Registration unit: solo player or team (REG-001 to REG-011).
+model Registration {
+  id              String             @id @default(uuid()) @db.Uuid
+  tournamentId    String             @map("tournament_id") @db.Uuid
+  captainPlayerId String             @map("captain_player_id") @db.Uuid
+  status          RegistrationStatus @default(confirmed)
+  teamName        String?            @map("team_name") @db.VarChar(50)
+  slotNumber      Int?               @map("slot_number")
+  checkedInAt     DateTime?          @map("checked_in_at") @db.Timestamptz
+  withdrawnAt     DateTime?          @map("withdrawn_at") @db.Timestamptz
+  withdrawReason  String?            @map("withdraw_reason")
+  createdAt       DateTime           @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt       DateTime           @updatedAt @map("updated_at") @db.Timestamptz
+
+  // Relations
+  tournament Tournament           @relation(fields: [tournamentId], references: [id])
+  members    RegistrationMember[]
+
+  @@unique([tournamentId, captainPlayerId])
+  @@index([tournamentId, status])
+  @@map("registrations")
+}
+
+/// Team member within a registration (duo/squad).
+model RegistrationMember {
+  id              String   @id @default(uuid()) @db.Uuid
+  registrationId  String   @map("registration_id") @db.Uuid
+  playerId        String   @map("player_id") @db.Uuid
+  role            TeamRole @default(member)
+  inviteStatus    String   @default("accepted") @map("invite_status") // pending, accepted, declined, removed
+  joinedAt        DateTime @default(now()) @map("joined_at") @db.Timestamptz
+
+  // Relations
+  registration Registration @relation(fields: [registrationId], references: [id])
+
+  @@unique([registrationId, playerId])
+  @@map("registration_members")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PHASE 4: ROOM CREDENTIALS & MATCH RESULTS
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Room credential (password/custom code) — encrypted at rest (SEC-006).
+model RoomCredential {
+  id          String   @id @default(uuid()) @db.Uuid
+  matchId     String   @unique @map("match_id") @db.Uuid
+  roomId      String   @map("room_id") @db.VarChar(50)
+  roomPass    String   @map("room_pass") @db.VarChar(100)
+  customCode  String?  @map("custom_code") @db.VarChar(50)
+  releasedAt  DateTime @default(now()) @map("released_at") @db.Timestamptz
+
+  // Relations
+  match TournamentMatch @relation(fields: [matchId], references: [id])
+
+  @@map("room_credentials")
+}
+
+/// Match result submitted by organizer (RESULT-001 to RESULT-004).
+model MatchResult {
+  id              String       @id @default(uuid()) @db.Uuid
+  matchId         String       @unique @map("match_id") @db.Uuid
+  submittedById   String       @map("submitted_by_id") @db.Uuid
+  status          ResultStatus @default(draft)
+  evidenceAssetId String?      @map("evidence_asset_id") @db.Uuid
+  adminNotes      String?      @map("admin_notes")
+  submittedAt     DateTime?    @map("submitted_at") @db.Timestamptz
+  finalizedAt     DateTime?    @map("finalized_at") @db.Timestamptz
+  createdAt       DateTime     @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt       DateTime     @updatedAt @map("updated_at") @db.Timestamptz
+
+  // Relations
+  match          TournamentMatch      @relation(fields: [matchId], references: [id])
+  playerResults  MatchPlayerResult[]
+
+  @@map("match_results")
+}
+
+/// Per-player/team result within a match (kills, placement, points).
+model MatchPlayerResult {
+  id              String  @id @default(uuid()) @db.Uuid
+  matchResultId   String  @map("match_result_id") @db.Uuid
+  registrationId  String  @map("registration_id") @db.Uuid
+  placement       Int
+  kills           Int     @default(0)
+  placementPoints Decimal @default(0) @map("placement_points") @db.Decimal(8, 2)
+  killPoints      Decimal @default(0) @map("kill_points") @db.Decimal(8, 2)
+  totalPoints     Decimal @default(0) @map("total_points") @db.Decimal(8, 2)
+  penaltyPoints   Decimal @default(0) @map("penalty_points") @db.Decimal(8, 2)
+  isBooyah        Boolean @default(false) @map("is_booyah")
+
+  // Relations
+  matchResult  MatchResult @relation(fields: [matchResultId], references: [id])
+
+  @@unique([matchResultId, registrationId])
+  @@map("match_player_results")
+}
