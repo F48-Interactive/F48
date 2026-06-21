@@ -6,7 +6,7 @@ import {
   isPositivePaise,
   parsePaiseString,
   MoneyError,
-} from '../../../src/lib/money';
+} from '../../../src/lib/money.js';
 
 describe('Money Utilities', () => {
   describe('toPaise', () => {

@@ -1,7 +1,7 @@
 import {
   createStateMachine,
   type StateMachineConfig,
-} from '../../../src/lib/state-machine';
+} from '../../../src/lib/state-machine.js';
 
 // Simple test state machine
 type TestState = 'draft' | 'submitted' | 'approved' | 'rejected';

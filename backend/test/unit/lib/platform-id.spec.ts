@@ -1,7 +1,7 @@
 import {
   generatePlatformId,
   validatePlatformId,
-} from '../../../src/lib/platform-id';
+} from '../../../src/lib/platform-id.js';
 
 describe('Platform ID', () => {
   describe('generatePlatformId', () => {
