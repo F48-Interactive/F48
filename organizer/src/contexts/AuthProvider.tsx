@@ -4,6 +4,8 @@ import { signInWithGoogle, firebaseSignOut } from '../lib/firebase';
 import { AuthContext } from './auth-context';
 import type { OrganizerProfile, User } from './auth-types';
 
+const SESSION_MARKER_KEY = 'f48_organizer_session_seen';
+
 async function withFullOrganizerProfile(user: User): Promise<User> {
   if (!user.organizer) return user;
 
@@ -29,8 +31,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const data = await api.get<{ user: User }>('/auth/me');
       setUser(await withFullOrganizerProfile(data.user));
+      localStorage.setItem(SESSION_MARKER_KEY, '1');
     } catch {
       setUser(null);
+      localStorage.removeItem(SESSION_MARKER_KEY);
     }
   }, []);
 
@@ -39,7 +43,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [fetchUser]);
 
   const initialize = useCallback(async () => {
-    await fetchUser();
+    const hasSeenSession = localStorage.getItem(SESSION_MARKER_KEY) === '1';
+    const isPublicLanding = window.location.pathname === '/';
+
+    if (hasSeenSession || !isPublicLanding) {
+      await fetchUser();
+    }
     setIsLoading(false);
   }, [fetchUser]);
 
@@ -53,6 +62,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const idToken = await signInWithGoogle();
     const data = await api.post<{ user: User }>('/auth/google', { idToken });
     setUser(await withFullOrganizerProfile(data.user));
+    localStorage.setItem(SESSION_MARKER_KEY, '1');
   }, []);
 
   const logout = useCallback(async () => {
@@ -63,6 +73,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     await firebaseSignOut();
     setUser(null);
+    localStorage.removeItem(SESSION_MARKER_KEY);
   }, []);
 
   const isAuthenticated = !!user?.id;
