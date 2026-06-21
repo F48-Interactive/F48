@@ -1,5 +1,6 @@
 # ─────────────────────────────────────────────────────────────────────────────
 # F48 Backend — Docker (Railway deployment)
+# Migrations run automatically on container start (prisma migrate deploy).
 # ─────────────────────────────────────────────────────────────────────────────
 
 # Build stage
@@ -11,8 +12,9 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci --ignore-scripts
 
-# Copy Prisma schema and generate client
+# Copy Prisma schema + config and generate client
 COPY prisma ./prisma/
+COPY prisma.config.ts ./
 RUN npx prisma generate
 
 # Copy source and build
@@ -33,11 +35,12 @@ RUN addgroup -g 1001 -S f48 && \
 
 WORKDIR /app
 
-# Copy built artifacts
+# Copy built artifacts + Prisma migrations for deploy
 COPY --from=builder --chown=f48:f48 /app/dist ./dist/
 COPY --from=builder --chown=f48:f48 /app/node_modules ./node_modules/
 COPY --from=builder --chown=f48:f48 /app/package.json ./
 COPY --from=builder --chown=f48:f48 /app/prisma ./prisma/
+COPY --from=builder --chown=f48:f48 /app/prisma.config.ts ./
 
 USER f48
 
@@ -47,4 +50,5 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
 
 EXPOSE ${PORT:-3000}
 
-CMD ["node", "dist/main.js"]
+# Runs migrations automatically then starts the app
+CMD ["npm", "run", "start:prod"]
