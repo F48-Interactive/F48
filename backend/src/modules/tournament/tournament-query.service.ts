@@ -77,7 +77,6 @@ export class TournamentQueryService {
           structureType: true,
           maxUnits: true,
           prizePoolPaise: true,
-          scheduledStartAt: true,
           bannerAssetId: true,
           createdAt: true,
           organizer: {

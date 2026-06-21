@@ -72,12 +72,6 @@ export class TournamentService {
           prizePoolPaise: data.prizePoolPaise
             ? BigInt(data.prizePoolPaise)
             : 0n,
-          scheduledStartAt: data.scheduledStartAt
-            ? new Date(data.scheduledStartAt)
-            : null,
-          registrationOpenAt: data.registrationOpenAt
-            ? new Date(data.registrationOpenAt)
-            : null,
           checkInDurationMin: data.checkInDurationMin,
           disputeWindowHours: data.disputeWindowHours ?? 24,
           gameMapId: data.gameMapId,
@@ -141,12 +135,6 @@ export class TournamentService {
         ...(data.prizePoolPaise !== undefined && {
           prizePoolPaise: BigInt(data.prizePoolPaise),
         }),
-        ...(data.scheduledStartAt !== undefined && {
-          scheduledStartAt: new Date(data.scheduledStartAt),
-        }),
-        ...(data.registrationOpenAt !== undefined && {
-          registrationOpenAt: new Date(data.registrationOpenAt),
-        }),
         ...(data.checkInDurationMin !== undefined && {
           checkInDurationMin: data.checkInDurationMin,
         }),
@@ -180,9 +168,20 @@ export class TournamentService {
     );
     await this.authority.assertTransitionPrerequisites(tournamentId, action);
 
+    const transitionTimestamps =
+      action === 'open_registration'
+        ? { registrationOpenAt: new Date() }
+        : action === 'close_registration'
+          ? { registrationCloseAt: new Date() }
+          : {};
+
     const updated = await this.prisma.tournament.update({
       where: { id: tournamentId },
-      data: { status: newState, version: { increment: 1 } },
+      data: {
+        status: newState,
+        version: { increment: 1 },
+        ...transitionTimestamps,
+      },
     });
 
     await this.statusHistory.record({
@@ -264,8 +263,6 @@ export class TournamentService {
         room.id,
         matchNumber,
         config.matchesPerRoom,
-        roomOrder,
-        data,
       );
     }
   }
@@ -277,25 +274,15 @@ export class TournamentService {
     roomId: string,
     startNumber: number,
     count: number,
-    roomOrder: number,
-    data: CreateTournamentInput,
   ): Promise<number> {
     let matchNumber = startNumber;
     for (let matchOrder = 1; matchOrder <= count; matchOrder += 1) {
-      const scheduled = data.stageConfig!.matchSchedule.find(
-        (entry) =>
-          entry.roomOrder === roomOrder &&
-          entry.matchOrder === matchOrder,
-      );
       await db.tournamentMatch.create({
         data: {
           tournamentId,
           stageId,
           roomId,
           matchNumber,
-          scheduledAt: scheduled?.scheduledAt
-            ? new Date(scheduled.scheduledAt)
-            : null,
         },
       });
       matchNumber += 1;

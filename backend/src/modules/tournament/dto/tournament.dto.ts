@@ -17,17 +17,6 @@ const FundingTypeSchema = z.enum([
 const StageConfigSchema = z.object({
   roomCount: z.number().int().min(1).max(4),
   matchesPerRoom: z.number().int().min(1).max(12),
-  matchSchedule: z
-    .array(
-      z.object({
-        roomOrder: z.number().int().min(1).max(4),
-        matchOrder: z.number().int().min(1).max(12),
-        scheduledAt: z.string().datetime().optional(),
-        map: z.string().max(40).optional(),
-      }),
-    )
-    .max(60)
-    .default([]),
 });
 
 export const CreateTournamentSchema = z.object({
@@ -40,8 +29,6 @@ export const CreateTournamentSchema = z.object({
   maxUnits: z.number().int().min(2).max(192),
   entryFeePaise: z.number().int().min(0).optional(),
   prizePoolPaise: z.number().int().min(0).optional(),
-  scheduledStartAt: z.string().datetime().optional(),
-  registrationOpenAt: z.string().datetime().optional(),
   checkInDurationMin: z.number().int().min(5).max(60).optional(),
   disputeWindowHours: z.number().int().min(1).max(72).optional(),
   gameMapId: z.string().uuid().optional(),
@@ -63,8 +50,6 @@ export const UpdateTournamentSchema = z.object({
   maxUnits: z.number().int().min(2).max(192).optional(),
   entryFeePaise: z.number().int().min(0).optional(),
   prizePoolPaise: z.number().int().min(0).optional(),
-  scheduledStartAt: z.string().datetime().optional(),
-  registrationOpenAt: z.string().datetime().optional(),
   checkInDurationMin: z.number().int().min(5).max(60).optional(),
   disputeWindowHours: z.number().int().min(1).max(72).optional(),
   gameMapId: z.string().uuid().optional(),

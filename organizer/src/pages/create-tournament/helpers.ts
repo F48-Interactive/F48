@@ -1,5 +1,4 @@
 import {
-  MAPS,
   MODE_CAPACITY,
   REQUIRED_TIEBREAKERS,
   SQUAD_BALANCED,
@@ -34,7 +33,6 @@ export function defaultForm(): TournamentForm {
     mode: 'squad',
     maxUnits: 12,
     numberOfMatches: 6,
-    registrationOpenAt: '',
     registrationApproval: 'automatic',
     mobileOnly: true,
     regionRestriction: '',
@@ -70,10 +68,6 @@ export function rupeesToPaise(value: string): number {
   return Math.round(parsed * 100);
 }
 
-export function toIso(value: string): string | undefined {
-  return value ? new Date(value).toISOString() : undefined;
-}
-
 export function updateMode(form: TournamentForm, mode: TournamentMode): TournamentForm {
   const maxUnits = MODE_CAPACITY[mode];
   return {
@@ -101,7 +95,7 @@ export function generateSchedule(
   const rooms = Math.ceil(maxUnits / MODE_CAPACITY[mode]);
   for (let roomOrder = 1; roomOrder <= rooms; roomOrder += 1) {
     for (let matchOrder = 1; matchOrder <= numberOfMatches; matchOrder += 1) {
-      rows.push(row(roomOrder, matchOrder, rows.length));
+      rows.push(row(roomOrder, matchOrder));
     }
   }
   return rows;
@@ -110,9 +104,8 @@ export function generateSchedule(
 function row(
   roomOrder: number,
   matchOrder: number,
-  index: number,
 ): MatchScheduleRow {
-  return { roomOrder, matchOrder, scheduledAt: '', map: MAPS[index % MAPS.length] ?? MAPS[0] };
+  return { roomOrder, matchOrder };
 }
 
 export function prizeTotal(form: TournamentForm): number {
@@ -169,10 +162,9 @@ export function metadata(form: TournamentForm): string {
     schedule: {
       roomReleaseMode: form.roomReleaseMode,
       joiningDeadlineMin: form.joiningDeadlineMin,
-      maps: form.matchSchedule.map(({ roomOrder, matchOrder, map }) => ({
+      matches: form.matchSchedule.map(({ roomOrder, matchOrder }) => ({
         roomOrder,
         matchOrder,
-        map,
       })),
     },
     scoring: {

@@ -27,7 +27,6 @@ import {
   placementPayload,
   roomCount,
   rupeesToPaise,
-  toIso,
 } from './create-tournament/helpers';
 import type { TournamentForm } from './create-tournament/types';
 import './CreateTournament.css';
@@ -219,7 +218,6 @@ function renderStep(
 }
 
 function tournamentPayload(form: TournamentForm) {
-  const firstMatch = form.matchSchedule.find((row) => row.scheduledAt);
   return {
     title: form.title.trim(),
     description: [form.shortDescription, form.fullDescription].filter(Boolean).join('\n\n'),
@@ -229,20 +227,12 @@ function tournamentPayload(form: TournamentForm) {
     scoringModel: form.scoringModel,
     maxUnits: form.maxUnits,
     prizePoolPaise: form.fundingType === 'free' ? undefined : rupeesToPaise(form.prizePoolRupees),
-    scheduledStartAt: toIso(firstMatch?.scheduledAt ?? ''),
-    registrationOpenAt: toIso(form.registrationOpenAt),
     checkInDurationMin: form.checkInDurationMin,
     disputeWindowHours: form.disputeWindowHours,
     rulesText: metadata(form),
     stageConfig: {
       roomCount: roomCount(form),
       matchesPerRoom: form.numberOfMatches,
-      matchSchedule: form.matchSchedule.map((row) => ({
-        roomOrder: row.roomOrder,
-        matchOrder: row.matchOrder,
-        scheduledAt: toIso(row.scheduledAt),
-        map: row.map,
-      })),
     },
   };
 }
@@ -271,8 +261,6 @@ function validate(form: TournamentForm, publish: boolean): string[] {
 
   if (publish) {
     if (!form.bannerUrl.trim()) errors.push('Tournament banner URL is required before publishing.');
-    if (!form.registrationOpenAt) errors.push('Slot booking open time is required before publishing.');
-    if (!form.matchSchedule.every((row) => row.scheduledAt && row.map)) errors.push('Every match needs a time and map.');
     if (form.fundingType !== 'free' && leaderboardTotal(form) !== rupeesToPaise(form.prizePoolRupees)) {
       errors.push('Official leaderboard prize rows must sum exactly to the prize pool.');
     }

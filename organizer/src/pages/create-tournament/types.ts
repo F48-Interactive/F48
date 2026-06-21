@@ -7,8 +7,6 @@ export type RegistrationApproval = 'automatic' | 'organizer_approval';
 export interface MatchScheduleRow {
   roomOrder: number;
   matchOrder: number;
-  scheduledAt: string;
-  map: string;
 }
 
 export interface PrizeRow {
@@ -40,7 +38,6 @@ export interface TournamentForm {
   mode: TournamentMode;
   maxUnits: number;
   numberOfMatches: number;
-  registrationOpenAt: string;
   registrationApproval: RegistrationApproval;
   mobileOnly: boolean;
   regionRestriction: string;

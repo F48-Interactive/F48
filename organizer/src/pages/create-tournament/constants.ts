@@ -6,7 +6,7 @@ export const STEPS = [
   'Mode',
   'Structure',
   'Slot Booking',
-  'Schedule',
+  'Operations',
   'Scoring',
   'Tie-breakers',
   'Prizes',
@@ -31,8 +31,6 @@ export const TEAM_SIZE: Record<TournamentMode, number> = {
   duo: 2,
   squad: 4,
 };
-
-export const MAPS = ['Bermuda', 'Purgatory', 'Kalahari', 'Alpine', 'NexTerra'];
 
 export const TIEBREAKER_OPTIONS = [
   { value: 'total_booyahs', label: 'More Booyahs' },

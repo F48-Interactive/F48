@@ -66,10 +66,6 @@ export class TournamentAuthorityService {
       data.entryFeePaise,
       data.prizePoolPaise,
     );
-    this.assertScheduleShape(
-      data.registrationOpenAt,
-      data.scheduledStartAt,
-    );
   }
 
   assertUpdateInput(
@@ -95,10 +91,6 @@ export class TournamentAuthorityService {
 
     this.assertModeCapacity(nextMode, nextStructureType, nextMaxUnits);
     assertFundingShape(nextFundingType, nextEntryFee, nextPrizePool);
-    this.assertScheduleShape(
-      data.registrationOpenAt,
-      data.scheduledStartAt,
-    );
   }
 
   assertScoringConfig(
@@ -142,8 +134,6 @@ export class TournamentAuthorityService {
           mode: true,
           prizePoolPaise: true,
           maxUnits: true,
-          scheduledStartAt: true,
-          registrationOpenAt: true,
         },
       });
 
@@ -165,16 +155,6 @@ export class TournamentAuthorityService {
         throw new BadRequestError(
           ErrorCodes.VALIDATION_FAILED,
           'Tournament banner is required before publishing.',
-        );
-      }
-
-      if (
-        !tournament.registrationOpenAt ||
-        !tournament.scheduledStartAt
-      ) {
-        throw new BadRequestError(
-          ErrorCodes.VALIDATION_FAILED,
-          'Slot booking open time and match schedule are required before publishing.',
         );
       }
 
@@ -314,19 +294,4 @@ export class TournamentAuthorityService {
     }
   }
 
-  private assertScheduleShape(
-    registrationOpenAt?: string,
-    scheduledStartAt?: string,
-  ): void {
-    if (registrationOpenAt && scheduledStartAt) {
-      const opensAt = new Date(registrationOpenAt).getTime();
-      const startsAt = new Date(scheduledStartAt).getTime();
-      if (opensAt >= startsAt) {
-        throw new BadRequestError(
-          ErrorCodes.VALIDATION_FAILED,
-          'Tournament start time must be after slot booking opens.',
-        );
-      }
-    }
-  }
 }

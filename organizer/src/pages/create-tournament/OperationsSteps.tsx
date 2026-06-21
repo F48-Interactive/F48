@@ -1,4 +1,4 @@
-import { MAPS, TEAM_SIZE } from './constants';
+import { TEAM_SIZE } from './constants';
 import type { MatchScheduleRow, TournamentForm } from './types';
 
 interface Props {
@@ -13,10 +13,7 @@ export function RegistrationStep({ form, setForm }: Props) {
       <div className="info-grid">
         <Info label="Booking rule" value={bookingRule(form)} />
         <Info label="Team requirement" value={teamRequirement(form)} />
-        <Info label="Booking closes" value="When full or held manually" />
-      </div>
-      <div className="field-grid">
-        <DateField label="Slot booking opens" value={form.registrationOpenAt} onChange={(value) => setForm({ ...form, registrationOpenAt: value })} />
+        <Info label="Booking control" value="Open or hold bookings from the tournament page" />
       </div>
       <div className="field-grid">
         <Select label="Slot booking approval" value={form.registrationApproval} onChange={(value) => setForm({ ...form, registrationApproval: value as TournamentForm['registrationApproval'] })} options={[['automatic', 'Automatic'], ['organizer_approval', 'Organizer approval required']]} />
@@ -31,16 +28,9 @@ export function RegistrationStep({ form, setForm }: Props) {
 }
 
 export function ScheduleStep({ form, setForm }: Props) {
-  const updateRow = (index: number, patch: Partial<MatchScheduleRow>) => {
-    const matchSchedule = form.matchSchedule.map((row, i) =>
-      i === index ? { ...row, ...patch } : row,
-    );
-    setForm({ ...form, matchSchedule });
-  };
-
   return (
     <div className="create-step">
-      <h2>Schedule and Maps</h2>
+      <h2>Match Operations</h2>
       <div className="field-grid">
         <NumberField label="Check-in duration (minutes)" value={form.checkInDurationMin} onChange={(value) => setForm({ ...form, checkInDurationMin: value })} />
         <Select label="Room-detail release" value={form.roomReleaseMode} onChange={(value) => setForm({ ...form, roomReleaseMode: value as TournamentForm['roomReleaseMode'] })} options={[['manual', 'Manual'], ['scheduled', 'Scheduled']]} />
@@ -49,16 +39,14 @@ export function ScheduleStep({ form, setForm }: Props) {
       <div className="schedule-table">
         <div className="schedule-head">
           <span>Match</span>
-          <span>Date and time</span>
-          <span>Map</span>
+          <span>Room</span>
+          <span>Order</span>
         </div>
-        {form.matchSchedule.map((row, index) => (
+        {form.matchSchedule.map((row) => (
           <div className="schedule-row" key={`${row.roomOrder}-${row.matchOrder}`}>
             <strong>{label(row)}</strong>
-            <input className="input" type="datetime-local" value={row.scheduledAt} onChange={(e) => updateRow(index, { scheduledAt: e.target.value })} />
-            <select className="input select" value={row.map} onChange={(e) => updateRow(index, { map: e.target.value })}>
-              {MAPS.map((map) => <option key={map} value={map}>{map}</option>)}
-            </select>
+            <span className="review-value">Room {row.roomOrder}</span>
+            <span className="review-value">Match {row.matchOrder}</span>
           </div>
         ))}
       </div>
@@ -76,10 +64,6 @@ function Field({ label, value, onChange, placeholder = '' }: { label: string; va
 
 function NumberField({ label, value, onChange }: { label: string; value: number; onChange: (value: number) => void }) {
   return <div className="input-group"><label className="input-label">{label}</label><input className="input" type="number" min="0" value={value} onChange={(e) => onChange(Number(e.target.value))} /></div>;
-}
-
-function DateField({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
-  return <div className="input-group"><label className="input-label">{label}</label><input className="input" type="datetime-local" value={value} onChange={(e) => onChange(e.target.value)} /></div>;
 }
 
 function Select({ label, value, onChange, options }: { label: string; value: string; onChange: (value: string) => void; options: string[][] }) {

@@ -22,8 +22,6 @@ interface Tournament {
   fundingType: string;
   description: string | null;
   maxUnits: number | null;
-  scheduledStartAt: string | null;
-  registrationOpenAt: string | null;
   createdAt: string;
   organizer?: { displayName: string | null };
 }
@@ -195,12 +193,6 @@ export function TournamentWorkspace() {
               <span className="review-label">Created</span>
               <span className="review-value">{new Date(tournament.createdAt).toLocaleDateString()}</span>
             </div>
-            {tournament.scheduledStartAt && (
-              <div className="review-item">
-                <span className="review-label">Scheduled Start</span>
-                <span className="review-value">{new Date(tournament.scheduledStartAt).toLocaleString()}</span>
-              </div>
-            )}
             {tournament.description && (
               <div className="review-item" style={{ gridColumn: '1 / -1' }}>
                 <span className="review-label">Description</span>
