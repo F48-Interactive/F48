@@ -1,6 +1,15 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { EventEmitter2 } from 'eventemitter2';
+import { createRequire } from 'node:module';
+import type {
+  ConstructorOptions,
+  EventEmitter2 as EventEmitter2Instance,
+} from 'eventemitter2';
 import type { F48Event, F48EventType } from '../types/events.js';
+
+const require = createRequire(import.meta.url);
+const EventEmitter2 = require('eventemitter2') as new (
+  options?: ConstructorOptions,
+) => EventEmitter2Instance;
 
 /**
  * Typed Event Bus Service.

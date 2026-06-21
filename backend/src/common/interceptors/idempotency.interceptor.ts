@@ -150,7 +150,7 @@ export class IdempotencyInterceptor implements NestInterceptor {
           resourceType,
           resourceId,
           responseStatus: IN_PROGRESS_STATUS,
-          responseBody: null,
+          responseBody: Prisma.JsonNull,
           expiresAt,
         },
       });

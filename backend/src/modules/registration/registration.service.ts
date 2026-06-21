@@ -68,7 +68,7 @@ export class RegistrationService {
       version: 1,
       timestamp: new Date().toISOString(),
       payload: {
-        confirmedCount: registration.slotNumber,
+        confirmedCount: registration.slotNumber ?? 1,
         maxRegistrations: tournament.maxUnits,
       },
     });

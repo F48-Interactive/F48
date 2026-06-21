@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../config/database.service.js';
+import { Prisma } from '../../generated/prisma/client.js';
 
 /**
  * Audit Service (ADMIN-011, LIFE-002).
@@ -37,8 +38,8 @@ export class AuditService {
           action: params.action,
           resourceType: params.resourceType,
           resourceId: params.resourceId,
-          oldValue: params.oldValue ?? undefined,
-          newValue: params.newValue ?? undefined,
+          oldValue: params.oldValue as Prisma.InputJsonValue | undefined,
+          newValue: params.newValue as Prisma.InputJsonValue | undefined,
           reason: params.reason,
           ipAddress: params.ipAddress,
           userAgent: params.userAgent,

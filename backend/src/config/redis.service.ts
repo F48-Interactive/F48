@@ -4,7 +4,7 @@ import {
   OnModuleDestroy,
   Logger,
 } from '@nestjs/common';
-import Redis from 'ioredis';
+import { Redis } from 'ioredis';
 import { EnvService } from './env.service.js';
 
 /**
